@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
+    background: #f0f2f5;
+    color: #202124;
+    line-height: 1.5;
+  }
+
+  /* Header */
+  .app-header {
+    background: #fff;
+    border-bottom: 1px solid #dadce0;
+    padding: 12px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .app-header .logo { font-size: 1.05rem; font-weight: 700; color: #1b2a4a; }
+  .role-badge { background: #5e35b1; color: #fff; font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+
+  .container { max-width: 1280px; margin: 0 auto; padding: 24px 20px; }
+  .page-title { font-size: 1.4rem; font-weight: 700; color: #202124; margin-bottom: 4px; }
+  .page-subtitle { font-size: 0.85rem; color: #5f6368; margin-bottom: 24px; }
+
+  /* Toolbar */
+  .toolbar {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    padding: 14px 20px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .month-nav { display: flex; align-items: center; gap: 12px; }
+  .month-nav button {
+    background: #fff; border: 1.5px solid #dadce0; border-radius: 8px;
+    padding: 8px 16px; cursor: pointer; font-size: 0.9rem; color: #202124;
+    font-weight: 600; font-family: inherit;
+  }
+  .month-nav button:hover:not(:disabled) { background: #f0f2f5; }
+  .month-nav button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .month-label { font-size: 1.15rem; font-weight: 700; color: #202124; min-width: 130px; text-align: center; }
+
+  .layout-toggle { display: flex; gap: 8px; align-items: center; font-size: 0.85rem; color: #5f6368; }
+  .layout-toggle select {
+    padding: 6px 10px; border: 1.5px solid #dadce0; border-radius: 6px;
+    font-size: 0.85rem; font-family: inherit; background: #fff;
+  }
+  .print-btn {
+    background: #1a73e8; color: #fff; border: none; border-radius: 8px;
+    padding: 8px 18px; font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    font-family: inherit;
+  }
+  .print-btn:hover { background: #1558b0; }
+
+  /* Card */
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .card-title { font-size: 1.05rem; font-weight: 700; margin-bottom: 14px; color: #202124; }
+
+  /* Full Calendar */
+  .full-cal { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .full-cal th {
+    font-size: 0.78rem; font-weight: 700; color: #5f6368; padding: 8px 4px;
+    text-align: center; border: 1px solid #e0e0e0; background: #f8f9fa;
+  }
+  .full-cal th.sun { color: #d93025; }
+  .full-cal th.sat { color: #1a73e8; }
+  .full-cal td {
+    border: 1px solid #e0e0e0; vertical-align: top;
+    height: 100px; padding: 4px 4px 6px;
+    background: #fff;
+  }
+  .full-cal td.empty { background: #fafafa; }
+  .full-cal td.weekend { background: #fce8e6; }
+  .full-cal td.holiday { background: #fef7e0; }
+  .full-cal td.meeting { background: #fef7e0; }
+  .full-cal td .daynum { font-size: 0.78rem; color: #5f6368; font-weight: 600; }
+  .full-cal td .day-tag { display: inline-block; font-size: 0.62rem; color: #b06000; margin-left: 4px; }
+  .full-cal td .visit {
+    display: block;
+    font-size: 0.7rem;
+    padding: 2px 4px;
+    border-radius: 3px;
+    margin-top: 2px;
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* 支援員カラーパレット */
+  .v-c0 { background: #e8f0fe; color: #1967d2; border-left: 3px solid #1a73e8; }
+  .v-c1 { background: #e6f4ea; color: #1e8e3e; border-left: 3px solid #34a853; }
+  .v-c2 { background: #fef7e0; color: #b06000; border-left: 3px solid #f9ab00; }
+  .v-c3 { background: #fce8e6; color: #c5221f; border-left: 3px solid #ea4335; }
+  .v-c4 { background: #f3e8fd; color: #7627bb; border-left: 3px solid #9334e6; }
+  .v-c5 { background: #e0f7fa; color: #00838f; border-left: 3px solid #00acc1; }
+  .v-c6 { background: #fff3e0; color: #e65100; border-left: 3px solid #ff6d00; }
+  .v-c7 { background: #f3e5f5; color: #6a1b9a; border-left: 3px solid #ab47bc; }
+  .v-c8 { background: #eceff1; color: #455a64; border-left: 3px solid #607d8b; }
+
+  /* Staff legend */
+  .staff-legend {
+    display: flex; gap: 12px; flex-wrap: wrap;
+    margin-bottom: 14px; padding: 10px 12px;
+    background: #f8f9fa; border-radius: 8px;
+  }
+  .legend-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.78rem; color: #202124;
+  }
+  .legend-dot { width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0; }
+
+  /* Per-staff calendars */
+  .staff-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  .staff-cal-card {
+    background: #fff; border: 1px solid #e0e0e0; border-radius: 8px;
+    padding: 12px;
+  }
+  .staff-cal-header {
+    font-size: 0.95rem; font-weight: 700; margin-bottom: 8px;
+    padding-bottom: 6px; border-bottom: 2px solid #1a73e8;
+    color: #202124;
+  }
+  .mini-cal { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  .mini-cal th {
+    font-size: 0.65rem; color: #5f6368; padding: 4px 0;
+    text-align: center; font-weight: 600;
+  }
+  .mini-cal th.sun { color: #d93025; }
+  .mini-cal th.sat { color: #1a73e8; }
+  .mini-cal td {
+    border: 1px solid #f0f0f0;
+    vertical-align: top;
+    padding: 3px 3px 4px;
+    height: 50px;
+    font-size: 0.7rem;
+  }
+  .mini-cal td.empty { background: #fafafa; }
+  .mini-cal td.weekend { background: #fce8e6; }
+  .mini-cal td.holiday { background: #fef7e0; }
+  .mini-cal td .daynum { font-size: 0.62rem; color: #5f6368; }
+  .mini-cal td .school {
+    display: block;
+    font-size: 0.62rem;
+    background: #e8f0fe;
+    color: #1967d2;
+    padding: 1px 3px;
+    border-radius: 2px;
+    margin-top: 2px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: #9aa0a6; }
+  .empty-state .icon { font-size: 3rem; margin-bottom: 8px; opacity: 0.4; }
+  .footer { text-align: center; padding: 20px; font-size: 0.78rem; color: #9aa0a6; }
+
+  /* Print Layout */
+  @media print {
+    body { background: #fff; }
+    .no-print { display: none !important; }
+    .container { max-width: none; padding: 0; }
+    .card { box-shadow: none; border: none; padding: 0; margin-bottom: 0; }
+    .card-title { font-size: 0.95rem; margin-bottom: 6px; }
+    .staff-legend { padding: 6px 8px; margin-bottom: 8px; }
+
+    /* Page 1: Full calendar */
+    .full-cal-page { page-break-after: always; }
+    .full-cal td { height: 22mm; padding: 2px 3px 3px; }
+    .full-cal td .visit { font-size: 0.6rem; padding: 1px 2px; }
+    .full-cal td .daynum { font-size: 0.7rem; }
+
+    /* Per-staff calendars */
+    .staff-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 6mm;
+    }
+    .staff-grid.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+    .staff-cal-card { border: 1px solid #ccc; padding: 6px; page-break-inside: avoid; }
+    .staff-cal-header { font-size: 0.85rem; padding-bottom: 3px; margin-bottom: 4px; }
+    .mini-cal td { height: 14mm; padding: 1px 2px 2px; }
+    .mini-cal td .daynum { font-size: 0.6rem; }
+    .mini-cal td .school { font-size: 0.55rem; }
+
+    @page { size: A4 landscape; margin: 8mm; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="app-header no-print">
+    <div class="logo">FSL鹿児島県ICT支援スケジュールシステム</div>
+    <span class="role-badge">教育委員会向け閲覧</span>
+  </div>
+
+  <div class="container">
+    <h2 class="page-title">確定スケジュール閲覧</h2>
+    <p class="page-subtitle">確定済の月のみ表示されます。月を切り替えるか、印刷ボタンから紙面/PDFに出力できます。</p>
+
+    <!-- Toolbar -->
+    <div class="toolbar no-print">
+      <div class="month-nav">
+        <button id="prevMonthBtn" onclick="changeMonth(-1)">&#9664; 前月</button>
+        <span class="month-label" id="monthLabel">-</span>
+        <button id="nextMonthBtn" onclick="changeMonth(1)">次月 &#9654;</button>
+      </div>
+      <div class="layout-toggle">
+        <span>支援員別カレンダー：</span>
+        <select id="layoutSelect" onchange="changeLayout()">
+          <option value="2">2列（4名/A4横）</option>
+          <option value="3">3列（6名/A4横、コンパクト）</option>
+        </select>
+      </div>
+      <button class="print-btn" onclick="window.print()">&#128424; 印刷 / PDF出力</button>
+    </div>
+
+    <div id="contentArea">
+      <!-- Full Calendar -->
+      <div class="card full-cal-page">
+        <div class="card-title" id="fullCalTitle">全体カレンダー</div>
+        <div id="staffLegend" class="staff-legend"></div>
+        <div id="fullCalArea"></div>
+      </div>
+
+      <!-- Per-Staff Calendars -->
+      <div class="card">
+        <div class="card-title" id="staffCalTitle">支援員別カレンダー</div>
+        <div id="staffGrid" class="staff-grid"></div>
+      </div>
+    </div>
+
+    <div id="emptyState" style="display:none;" class="empty-state">
+      <div class="icon">&#128197;</div>
+      <div>確定済みのスケジュールはまだありません。</div>
+    </div>
+  </div>
+
+  <div class="footer no-print">FSL鹿児島県ICT支援スケジュールシステム - 教育委員会向け閲覧画面</div>
+
+<script>
+  var schedule = JSON.parse(<?!= JSON.stringify(schedule) ?>);
+  var confirmedMonths = JSON.parse(<?!= JSON.stringify(confirmedMonths) ?>);
+  var staffMembers = JSON.parse(<?!= JSON.stringify(staffMembers) ?>);
+  var saHolidays = JSON.parse(<?!= JSON.stringify(holidays) ?>);
+  var saMeetings = JSON.parse(<?!= JSON.stringify(meetings) ?>);
+
+  // 祝日（GASと同じハードコード）
+  var JP_HOLIDAYS = {
+    '2026-01-01':'元日','2026-01-12':'成人の日','2026-02-11':'建国記念の日','2026-02-23':'天皇誕生日',
+    '2026-03-20':'春分の日','2026-04-29':'昭和の日','2026-05-03':'憲法記念日','2026-05-04':'みどりの日',
+    '2026-05-05':'こどもの日','2026-05-06':'振替休日','2026-07-20':'海の日','2026-08-11':'山の日',
+    '2026-09-21':'敬老の日','2026-09-23':'秋分の日','2026-10-12':'スポーツの日',
+    '2026-11-03':'文化の日','2026-11-23':'勤労感謝の日',
+    '2027-01-01':'元日','2027-01-11':'成人の日','2027-02-11':'建国記念の日','2027-02-23':'天皇誕生日','2027-03-21':'春分の日'
+  };
+  for (var hi = 0; hi < saHolidays.length; hi++) JP_HOLIDAYS[saHolidays[hi].date] = saHolidays[hi].name || '特別休日';
+  var meetingMap = {};
+  for (var mi = 0; mi < saMeetings.length; mi++) meetingMap[saMeetings[mi].date] = saMeetings[mi].name || '定例会';
+
+  // 支援員→色インデックス
+  var staffColorIdx = {};
+  for (var si = 0; si < staffMembers.length; si++) {
+    staffColorIdx[staffMembers[si]] = si;
+  }
+
+  // 月別スケジュールマップ: { 'YYYY-MM': { 'YYYY-MM-DD': [entries] } }
+  var monthDateMap = {};
+  for (var i = 0; i < schedule.length; i++) {
+    var s = schedule[i];
+    if (!monthDateMap[s.targetMonth]) monthDateMap[s.targetMonth] = {};
+    if (!monthDateMap[s.targetMonth][s.date]) monthDateMap[s.targetMonth][s.date] = [];
+    monthDateMap[s.targetMonth][s.date].push(s);
+  }
+
+  // 現在表示中の月インデックス（confirmedMonths内）
+  var currentIdx = confirmedMonths.length > 0 ? confirmedMonths.length - 1 : -1;
+
+  document.addEventListener('DOMContentLoaded', function() {
+    if (confirmedMonths.length === 0) {
+      document.getElementById('contentArea').style.display = 'none';
+      document.querySelector('.toolbar').style.display = 'none';
+      document.getElementById('emptyState').style.display = 'block';
+      return;
+    }
+    renderLegend();
+    renderAll();
+  });
+
+  function renderLegend() {
+    var html = '';
+    for (var i = 0; i < staffMembers.length; i++) {
+      html += '<div class="legend-chip">' +
+        '<div class="legend-dot v-c' + (i % 9) + '"></div>' +
+        esc(staffMembers[i]) +
+        '</div>';
+    }
+    document.getElementById('staffLegend').innerHTML = html;
+  }
+
+  function changeMonth(delta) {
+    var next = currentIdx + delta;
+    if (next < 0 || next >= confirmedMonths.length) return;
+    currentIdx = next;
+    renderAll();
+  }
+
+  function changeLayout() {
+    renderStaffGrid();
+  }
+
+  function renderAll() {
+    var ym = confirmedMonths[currentIdx];
+    document.getElementById('monthLabel').textContent = formatMonth(ym);
+    document.getElementById('fullCalTitle').textContent = formatMonth(ym) + ' 全体カレンダー';
+    document.getElementById('staffCalTitle').textContent = formatMonth(ym) + ' 支援員別カレンダー';
+
+    document.getElementById('prevMonthBtn').disabled = (currentIdx <= 0);
+    document.getElementById('nextMonthBtn').disabled = (currentIdx >= confirmedMonths.length - 1);
+
+    renderFullCalendar(ym);
+    renderStaffGrid();
+  }
+
+  function getMonthMeta(ym) {
+    var p = ym.split('-');
+    var year = parseInt(p[0], 10);
+    var month = parseInt(p[1], 10);
+    var firstDow = new Date(year, month - 1, 1).getDay();
+    var lastDay = new Date(year, month, 0).getDate();
+    return { year: year, month: month, firstDow: firstDow, lastDay: lastDay };
+  }
+
+  function dateStr(year, month, d) {
+    return year + '-' + String(month).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  }
+
+  function renderFullCalendar(ym) {
+    var meta = getMonthMeta(ym);
+    var dateMap = monthDateMap[ym] || {};
+    var html = '<table class="full-cal"><thead><tr>';
+    var dows = ['日','月','火','水','木','金','土'];
+    for (var i = 0; i < dows.length; i++) {
+      var cls = i === 0 ? 'sun' : i === 6 ? 'sat' : '';
+      html += '<th class="' + cls + '">' + dows[i] + '</th>';
+    }
+    html += '</tr></thead><tbody><tr>';
+
+    var cell = 0;
+    for (var i = 0; i < meta.firstDow; i++) { html += '<td class="empty"></td>'; cell++; }
+    for (var d = 1; d <= meta.lastDay; d++) {
+      var ds = dateStr(meta.year, meta.month, d);
+      var dow = (meta.firstDow + d - 1) % 7;
+      var cls = '';
+      if (dow === 0 || dow === 6) cls = 'weekend';
+      else if (JP_HOLIDAYS[ds]) cls = 'holiday';
+      else if (meetingMap[ds]) cls = 'meeting';
+
+      html += '<td class="' + cls + '">';
+      var tag = '';
+      if (JP_HOLIDAYS[ds]) tag = '<span class="day-tag">' + esc(JP_HOLIDAYS[ds]) + '</span>';
+      else if (meetingMap[ds]) tag = '<span class="day-tag">' + esc(meetingMap[ds]) + '</span>';
+      html += '<span class="daynum">' + d + '</span>' + tag;
+
+      var entries = dateMap[ds] || [];
+      // 支援員の順序で並べる
+      entries.sort(function(a, b) {
+        var ia = staffColorIdx[a.staffName] !== undefined ? staffColorIdx[a.staffName] : 99;
+        var ib = staffColorIdx[b.staffName] !== undefined ? staffColorIdx[b.staffName] : 99;
+        return ia - ib;
+      });
+      for (var k = 0; k < entries.length; k++) {
+        var e = entries[k];
+        var colorIdx = staffColorIdx[e.staffName] !== undefined ? staffColorIdx[e.staffName] : 8;
+        var schoolShort = e.schoolName.replace('中学校', '');
+        var staffShort = (e.staffName || '').split(/[\s　]/)[0];
+        html += '<div class="visit v-c' + (colorIdx % 9) + '" title="' + esc(e.schoolName) + ' - ' + esc(e.staffName) + '">' +
+          esc(schoolShort) + ' / ' + esc(staffShort) +
+          '</div>';
+      }
+
+      html += '</td>';
+      cell++;
+      if (cell % 7 === 0 && d < meta.lastDay) html += '</tr><tr>';
+    }
+    var rem = (7 - cell % 7) % 7;
+    for (var r = 0; r < rem; r++) html += '<td class="empty"></td>';
+    html += '</tr></tbody></table>';
+    document.getElementById('fullCalArea').innerHTML = html;
+  }
+
+  function renderStaffGrid() {
+    var ym = confirmedMonths[currentIdx];
+    if (!ym) return;
+    var meta = getMonthMeta(ym);
+    var dateMap = monthDateMap[ym] || {};
+
+    var layout = document.getElementById('layoutSelect').value;
+    var grid = document.getElementById('staffGrid');
+    grid.style.gridTemplateColumns = 'repeat(' + layout + ', 1fr)';
+    grid.className = 'staff-grid' + (layout === '3' ? ' cols-3' : '');
+
+    var html = '';
+    for (var s = 0; s < staffMembers.length; s++) {
+      var staffName = staffMembers[s];
+      var colorIdx = s % 9;
+      // この支援員が実際に訪問する予定のみ抽出（origStaffは反映しない）
+      var entriesByDate = {};
+      for (var dStr in dateMap) {
+        var entries = dateMap[dStr];
+        for (var e = 0; e < entries.length; e++) {
+          if (entries[e].staffName === staffName) {
+            if (!entriesByDate[dStr]) entriesByDate[dStr] = [];
+            entriesByDate[dStr].push(entries[e]);
+          }
+        }
+      }
+
+      html += '<div class="staff-cal-card">' +
+        '<div class="staff-cal-header" style="border-bottom-color: var(--legend-' + colorIdx + ', #1a73e8);">' +
+        esc(staffName) + '</div>';
+      html += renderMiniCal(meta, entriesByDate, staffName);
+      html += '</div>';
+    }
+    grid.innerHTML = html;
+  }
+
+  function renderMiniCal(meta, entriesByDate, staffName) {
+    var html = '<table class="mini-cal"><thead><tr>';
+    var dows = ['日','月','火','水','木','金','土'];
+    for (var i = 0; i < dows.length; i++) {
+      var cls = i === 0 ? 'sun' : i === 6 ? 'sat' : '';
+      html += '<th class="' + cls + '">' + dows[i] + '</th>';
+    }
+    html += '</tr></thead><tbody><tr>';
+    var cell = 0;
+    for (var i = 0; i < meta.firstDow; i++) { html += '<td class="empty"></td>'; cell++; }
+    for (var d = 1; d <= meta.lastDay; d++) {
+      var ds = dateStr(meta.year, meta.month, d);
+      var dow = (meta.firstDow + d - 1) % 7;
+      var cls = '';
+      if (dow === 0 || dow === 6) cls = 'weekend';
+      else if (JP_HOLIDAYS[ds]) cls = 'holiday';
+      else if (meetingMap[ds]) cls = 'meeting';
+
+      html += '<td class="' + cls + '">';
+      html += '<span class="daynum">' + d + '</span>';
+      var entries = entriesByDate[ds] || [];
+      for (var k = 0; k < entries.length; k++) {
+        var e = entries[k];
+        var schoolShort = e.schoolName.replace('中学校', '');
+        html += '<div class="school" title="' + esc(e.schoolName) + '">' +
+          esc(schoolShort) + '</div>';
+      }
+      html += '</td>';
+      cell++;
+      if (cell % 7 === 0 && d < meta.lastDay) html += '</tr><tr>';
+    }
+    var rem = (7 - cell % 7) % 7;
+    for (var r = 0; r < rem; r++) html += '<td class="empty"></td>';
+    html += '</tr></tbody></table>';
+    return html;
+  }
+
+  function formatMonth(ym) {
+    var p = ym.split('-');
+    if (p.length !== 2) return ym;
+    return p[0] + '年' + parseInt(p[1], 10) + '月';
+  }
+
+  function esc(s) {
+    return s ? String(s)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#39;') : '';
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design B: タブレイアウト - FSL鹿児島県ICT支援スケジュールシステム</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Noto Sans JP", Meiryo, sans-serif;
+    background: #e0e0e0;
+    color: #333;
+    line-height: 1.6;
+  }
+
+  /* ===== Section Dividers ===== */
+  .screen-section {
+    max-width: 1024px;
+    margin: 40px auto;
+    background: #f5f5f5;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    aspect-ratio: 4/3;
+    display: flex;
+    flex-direction: column;
+  }
+  .section-label {
+    background: #263238;
+    color: #fff;
+    padding: 12px 24px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .section-label .badge {
+    background: #00897b;
+    color: #fff;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 11px;
+  }
+
+  /* ===== Top Bar ===== */
+  .topbar {
+    background: #00897b;
+    color: #fff;
+    padding: 0 24px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+  .topbar .system-name {
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.5px;
+  }
+  .topbar .user-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 13px;
+  }
+  .topbar .user-info .avatar {
+    width: 30px;
+    height: 30px;
+    background: rgba(255,255,255,0.25);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  .topbar .logout-btn {
+    background: rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.3);
+    color: #fff;
+    padding: 4px 14px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+
+  /* ===== Status Banner ===== */
+  .status-banner {
+    padding: 10px 24px;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .status-banner.green { background: #e8f5e9; color: #2e7d32; border-left: 4px solid #43a047; }
+  .status-banner.yellow { background: #fff8e1; color: #f57f17; border-left: 4px solid #fbc02d; }
+  .status-banner.gray { background: #eceff1; color: #607d8b; border-left: 4px solid #90a4ae; }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+  }
+  .status-banner.green .status-dot { background: #43a047; }
+
+  /* ===== Tabs ===== */
+  .tab-bar {
+    display: flex;
+    background: #fff;
+    border-bottom: 2px solid #e0e0e0;
+    padding: 0 24px;
+    flex-shrink: 0;
+  }
+  .tab-item {
+    padding: 12px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #888;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: all 0.2s;
+  }
+  .tab-item.active {
+    color: #00897b;
+    border-bottom-color: #00897b;
+  }
+  .tab-item:hover:not(.active) {
+    color: #555;
+  }
+
+  /* ===== Content Area ===== */
+  .content-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    background: #f5f5f5;
+  }
+  .card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .card-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card-title .icon {
+    width: 20px;
+    height: 20px;
+    background: #e0f2f1;
+    color: #00897b;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+  }
+
+  /* ===== Stepper ===== */
+  .stepper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 20px;
+    padding: 16px;
+    background: #fff;
+    border-radius: 8px;
+  }
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #aaa;
+  }
+  .step.active { color: #00897b; font-weight: 700; }
+  .step.done { color: #81c784; }
+  .step-num {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: #e0e0e0;
+    color: #999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .step.active .step-num { background: #00897b; color: #fff; }
+  .step.done .step-num { background: #81c784; color: #fff; }
+  .step-connector {
+    width: 48px;
+    height: 2px;
+    background: #e0e0e0;
+    margin: 0 8px;
+  }
+  .step.done + .step-connector,
+  .step-connector.done { background: #81c784; }
+
+  /* ===== Calendar Grid ===== */
+  .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    font-size: 12px;
+  }
+  .cal-header {
+    text-align: center;
+    font-weight: 700;
+    padding: 6px 0;
+    font-size: 11px;
+    color: #666;
+  }
+  .cal-header:first-child { color: #e53935; }
+  .cal-header:last-child { color: #1e88e5; }
+  .cal-cell {
+    text-align: center;
+    padding: 8px 4px;
+    border-radius: 6px;
+    cursor: pointer;
+    position: relative;
+    min-height: 38px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+  }
+  .cal-cell:hover { background: #e0f2f1; }
+  .cal-cell.empty { cursor: default; }
+  .cal-cell.empty:hover { background: transparent; }
+  .cal-cell.selected {
+    background: #00897b;
+    color: #fff;
+    font-weight: 700;
+    border-radius: 50%;
+  }
+  .cal-cell.holiday { color: #e53935; background: #ffebee; cursor: not-allowed; }
+  .cal-cell.weekend { color: #9e9e9e; background: #fafafa; cursor: not-allowed; }
+  .cal-cell.staff-off { background: #fff3e0; color: #e65100; cursor: not-allowed; }
+  .cal-cell.meeting { background: #f3e5f5; color: #7b1fa2; cursor: not-allowed; }
+  .cal-cell.today {
+    border: 2px solid #00897b;
+  }
+
+  /* ===== Legend ===== */
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 11px;
+    color: #666;
+    margin-top: 12px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .legend-dot {
+    width: 12px; height: 12px; border-radius: 3px;
+  }
+
+  /* ===== Chips ===== */
+  .chip-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .chip {
+    background: #e0f2f1;
+    color: #00695c;
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .chip .remove {
+    width: 16px; height: 16px;
+    background: rgba(0,0,0,0.1);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    cursor: pointer;
+    color: #00695c;
+  }
+
+  /* ===== Comment Box ===== */
+  .comment-box {
+    width: 100%;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    padding: 10px 12px;
+    font-size: 13px;
+    resize: none;
+    font-family: inherit;
+    color: #666;
+    background: #fafafa;
+  }
+
+  /* ===== Buttons ===== */
+  .btn {
+    padding: 10px 28px;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-primary {
+    background: #00897b;
+    color: #fff;
+  }
+  .btn-primary:hover { background: #00796b; }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid #00897b;
+    color: #00897b;
+  }
+  .btn-sm {
+    padding: 6px 16px;
+    font-size: 12px;
+  }
+  .btn-gray {
+    background: #eee;
+    color: #555;
+  }
+
+  /* ===== Timeline ===== */
+  .timeline-item {
+    display: flex;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+    align-items: flex-start;
+  }
+  .timeline-item:last-child { border-bottom: none; }
+  .timeline-date {
+    min-width: 80px;
+    text-align: center;
+  }
+  .timeline-date .day {
+    font-size: 22px;
+    font-weight: 700;
+    color: #00897b;
+    line-height: 1;
+  }
+  .timeline-date .month {
+    font-size: 11px;
+    color: #999;
+  }
+  .timeline-date .weekday {
+    font-size: 11px;
+    color: #666;
+    background: #f0f0f0;
+    border-radius: 4px;
+    padding: 1px 6px;
+    margin-top: 2px;
+    display: inline-block;
+  }
+  .timeline-body {
+    flex: 1;
+    background: #f9fffe;
+    border-left: 3px solid #00897b;
+    padding: 10px 16px;
+    border-radius: 0 6px 6px 0;
+  }
+  .timeline-body .time {
+    font-size: 12px;
+    color: #00897b;
+    font-weight: 600;
+  }
+  .timeline-body .staff {
+    font-size: 13px;
+    color: #333;
+    font-weight: 600;
+  }
+  .timeline-body .detail {
+    font-size: 11px;
+    color: #888;
+    margin-top: 2px;
+  }
+
+  /* ===== SA Navigation Tabs ===== */
+  .sa-nav {
+    display: flex;
+    background: #00897b;
+    padding: 0 16px;
+    flex-shrink: 0;
+  }
+  .sa-nav .nav-item {
+    padding: 12px 18px;
+    color: rgba(255,255,255,0.7);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    transition: all 0.2s;
+  }
+  .sa-nav .nav-item.active {
+    color: #fff;
+    border-bottom-color: #fff;
+    background: rgba(255,255,255,0.1);
+  }
+  .sa-nav .nav-item:hover:not(.active) {
+    color: rgba(255,255,255,0.9);
+  }
+
+  /* ===== Progress Bar ===== */
+  .progress-container {
+    margin: 8px 0;
+  }
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 6px;
+  }
+  .progress-bar {
+    height: 10px;
+    background: #e0e0e0;
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #00897b, #26a69a);
+    border-radius: 5px;
+    transition: width 0.5s;
+  }
+
+  /* ===== Donut Chart Placeholder ===== */
+  .donut-wrap {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+  }
+  .donut {
+    width: 120px; height: 120px;
+    border-radius: 50%;
+    background: conic-gradient(#00897b 0% 55%, #ffb74d 55% 75%, #e0e0e0 75% 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .donut-hole {
+    width: 70px; height: 70px;
+    background: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+    color: #00897b;
+  }
+  .donut-legend {
+    font-size: 12px;
+    color: #666;
+  }
+  .donut-legend div {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .donut-legend .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+
+  /* ===== Alert List ===== */
+  .alert-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+  .alert-item.warn { background: #fff3e0; color: #e65100; }
+  .alert-item.error { background: #ffebee; color: #c62828; }
+  .alert-item.info { background: #e3f2fd; color: #1565c0; }
+  .alert-icon {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .alert-item.warn .alert-icon { background: #ffe0b2; }
+  .alert-item.error .alert-icon { background: #ffcdd2; }
+
+  /* ===== Action Buttons Row ===== */
+  .action-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+
+  /* ===== Split View ===== */
+  .split-view {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* ===== School List (SA) ===== */
+  .school-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-radius: 6px;
+    margin-bottom: 4px;
+    font-size: 12px;
+    border: 1px solid #eee;
+    background: #fff;
+    cursor: grab;
+  }
+  .school-item:hover { border-color: #00897b; background: #f9fffe; }
+  .school-item .drag-handle {
+    color: #ccc;
+    margin-right: 8px;
+    font-size: 14px;
+  }
+  .school-item .staff-tag {
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .staff-a { background: #00897b; }
+  .staff-b { background: #5c6bc0; }
+  .staff-c { background: #ef6c00; }
+  .staff-unassigned { background: #bdbdbd; }
+
+  /* ===== Filter Chips ===== */
+  .filter-chips {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .filter-chip {
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid #ddd;
+    background: #fff;
+    color: #666;
+  }
+  .filter-chip.active {
+    background: #00897b;
+    color: #fff;
+    border-color: #00897b;
+  }
+
+  /* ===== View Toggle ===== */
+  .view-toggle {
+    display: inline-flex;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    overflow: hidden;
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+  .view-toggle button {
+    padding: 6px 16px;
+    border: none;
+    background: #fff;
+    color: #666;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .view-toggle button.active {
+    background: #00897b;
+    color: #fff;
+  }
+
+  /* ===== Support Staff Day Card ===== */
+  .day-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+    border-left: 4px solid #00897b;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  }
+  .day-card .day-header {
+    font-size: 14px;
+    font-weight: 700;
+    color: #333;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .day-card .day-header .weekday-badge {
+    font-size: 11px;
+    background: #e0f2f1;
+    color: #00897b;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .day-card .visit-entry {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 6px 0;
+    font-size: 13px;
+    border-bottom: 1px dashed #f0f0f0;
+  }
+  .day-card .visit-entry:last-child { border-bottom: none; }
+  .day-card .visit-time {
+    color: #00897b;
+    font-weight: 600;
+    font-size: 12px;
+    min-width: 90px;
+  }
+  .day-card .visit-school {
+    font-weight: 600;
+    color: #333;
+  }
+  .day-card .visit-addr {
+    font-size: 11px;
+    color: #999;
+  }
+
+  /* ===== Support Staff Calendar ===== */
+  .staff-cal-cell {
+    min-height: 60px;
+    padding: 4px;
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    font-size: 11px;
+  }
+  .staff-cal-cell .cell-date {
+    font-weight: 700;
+    font-size: 12px;
+    color: #555;
+    margin-bottom: 2px;
+  }
+  .staff-cal-cell .cell-event {
+    background: #e0f2f1;
+    color: #00695c;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 10px;
+    margin-bottom: 2px;
+    border-left: 2px solid #00897b;
+  }
+
+  /* ===== Footer ===== */
+  .mockup-footer {
+    text-align: center;
+    padding: 24px;
+    color: #999;
+    font-size: 12px;
+  }
+
+  /* ===== Month Header ===== */
+  .month-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .month-header h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #333;
+  }
+  .month-nav {
+    display: flex;
+    gap: 4px;
+  }
+  .month-nav button {
+    width: 28px; height: 28px;
+    border: 1px solid #ddd;
+    background: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ===== Grid helpers ===== */
+  .grid-2col {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* ===== Scrollbar ===== */
+  .content-area::-webkit-scrollbar { width: 6px; }
+  .content-area::-webkit-scrollbar-track { background: transparent; }
+  .content-area::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- SCREEN 1: 先生向け画面 (Teacher Screen)                        -->
+<!-- ============================================================ -->
+<div class="screen-section">
+  <div class="section-label">
+    <span>SCREEN 1</span>
+    <span class="badge">先生向け画面</span>
+    <span style="color:rgba(255,255,255,0.5)">Teacher Screen</span>
+  </div>
+
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div class="system-name">FSL鹿児島県ICT支援スケジュールシステム</div>
+    <div class="user-info">
+      <div class="avatar">山</div>
+      <span>山田先生（福岡市立博多小学校）</span>
+      <button class="logout-btn">ログアウト</button>
+    </div>
+  </div>
+
+  <!-- Status Banner -->
+  <div class="status-banner green">
+    <span class="status-dot"></span>
+    受付中 ── 2026年6月分の候補日を入力してください（締切：5月20日）
+  </div>
+
+  <!-- Tabs: 候補日入力 / 確定スケジュール -->
+  <div class="tab-bar">
+    <div class="tab-item active">候補日入力</div>
+    <div class="tab-item">確定スケジュール</div>
+  </div>
+
+  <!-- Content: 候補日入力 -->
+  <div class="content-area">
+    <!-- Stepper -->
+    <div class="stepper">
+      <div class="step active">
+        <div class="step-num">1</div>
+        <span>1回目候補</span>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <span>2回目候補</span>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <span>確認・送信</span>
+      </div>
+    </div>
+
+    <div class="grid-2col">
+      <!-- Calendar -->
+      <div class="card">
+        <div class="month-header">
+          <div class="month-nav"><button>&lt;</button></div>
+          <h3>2026年 6月</h3>
+          <div class="month-nav"><button>&gt;</button></div>
+        </div>
+        <div class="calendar-grid">
+          <div class="cal-header">日</div>
+          <div class="cal-header">月</div>
+          <div class="cal-header">火</div>
+          <div class="cal-header">水</div>
+          <div class="cal-header">木</div>
+          <div class="cal-header">金</div>
+          <div class="cal-header">土</div>
+
+          <div class="cal-cell empty"></div>
+          <div class="cal-cell">1</div>
+          <div class="cal-cell selected">2</div>
+          <div class="cal-cell meeting">3</div>
+          <div class="cal-cell">4</div>
+          <div class="cal-cell">5</div>
+          <div class="cal-cell weekend">6</div>
+
+          <div class="cal-cell weekend">7</div>
+          <div class="cal-cell">8</div>
+          <div class="cal-cell selected">9</div>
+          <div class="cal-cell staff-off">10</div>
+          <div class="cal-cell">11</div>
+          <div class="cal-cell">12</div>
+          <div class="cal-cell weekend">13</div>
+
+          <div class="cal-cell weekend">14</div>
+          <div class="cal-cell">15</div>
+          <div class="cal-cell">16</div>
+          <div class="cal-cell meeting">17</div>
+          <div class="cal-cell selected">18</div>
+          <div class="cal-cell">19</div>
+          <div class="cal-cell weekend">20</div>
+
+          <div class="cal-cell weekend">21</div>
+          <div class="cal-cell">22</div>
+          <div class="cal-cell holiday">23</div>
+          <div class="cal-cell">24</div>
+          <div class="cal-cell">25</div>
+          <div class="cal-cell">26</div>
+          <div class="cal-cell weekend">27</div>
+
+          <div class="cal-cell weekend">28</div>
+          <div class="cal-cell">29</div>
+          <div class="cal-cell">30</div>
+          <div class="cal-cell empty"></div>
+          <div class="cal-cell empty"></div>
+          <div class="cal-cell empty"></div>
+          <div class="cal-cell empty"></div>
+        </div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#00897b"></div>選択済み</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#ffebee; border:1px solid #e53935"></div>祝日</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#fafafa; border:1px solid #ccc"></div>土日</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#fff3e0; border:1px solid #e65100"></div>支援員休み</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f3e5f5; border:1px solid #7b1fa2"></div>定例会</div>
+        </div>
+      </div>
+
+      <!-- Right Panel -->
+      <div>
+        <div class="card">
+          <div class="card-title">
+            <div class="icon">&#10003;</div>
+            選択した候補日（1回目）
+          </div>
+          <div class="chip-container">
+            <div class="chip">6月2日（火）<span class="remove">&times;</span></div>
+            <div class="chip">6月9日（火）<span class="remove">&times;</span></div>
+            <div class="chip">6月18日（木）<span class="remove">&times;</span></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <div class="icon">&#9998;</div>
+            コメント・備考
+          </div>
+          <textarea class="comment-box" rows="3" placeholder="例：午前中が望ましいです。プログラミングの授業支援を希望します。"></textarea>
+        </div>
+
+        <div style="text-align: right; margin-top: 12px;">
+          <button class="btn btn-outline btn-sm" style="margin-right: 8px;">下書き保存</button>
+          <button class="btn btn-primary">次へ：2回目候補 &#8594;</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SCREEN 1b: 先生向け - 確定スケジュール Tab                      -->
+<!-- ============================================================ -->
+<div class="screen-section">
+  <div class="section-label">
+    <span>SCREEN 1b</span>
+    <span class="badge">先生向け画面</span>
+    <span style="color:rgba(255,255,255,0.5)">確定スケジュール Tab</span>
+  </div>
+
+  <div class="topbar">
+    <div class="system-name">FSL鹿児島県ICT支援スケジュールシステム</div>
+    <div class="user-info">
+      <div class="avatar">山</div>
+      <span>山田先生（福岡市立博多小学校）</span>
+      <button class="logout-btn">ログアウト</button>
+    </div>
+  </div>
+
+  <div class="status-banner green">
+    <span class="status-dot"></span>
+    受付中 ── 2026年6月分の候補日を入力してください（締切：5月20日）
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab-item">候補日入力</div>
+    <div class="tab-item active">確定スケジュール</div>
+  </div>
+
+  <div class="content-area">
+    <div class="card">
+      <div class="card-title">
+        <div class="icon">&#128197;</div>
+        確定済み訪問スケジュール（2026年5月分）
+      </div>
+
+      <div class="timeline-item">
+        <div class="timeline-date">
+          <div class="month">5月</div>
+          <div class="day">8</div>
+          <div class="weekday">金曜日</div>
+        </div>
+        <div class="timeline-body">
+          <div class="time">10:00 - 12:00</div>
+          <div class="staff">担当：佐藤 太郎</div>
+          <div class="detail">プログラミング授業支援（4年生）</div>
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <div class="timeline-date">
+          <div class="month">5月</div>
+          <div class="day">15</div>
+          <div class="weekday">金曜日</div>
+        </div>
+        <div class="timeline-body">
+          <div class="time">13:00 - 15:00</div>
+          <div class="staff">担当：佐藤 太郎</div>
+          <div class="detail">タブレット活用研修（教職員向け）</div>
+        </div>
+      </div>
+
+      <div class="timeline-item">
+        <div class="timeline-date">
+          <div class="month">5月</div>
+          <div class="day">22</div>
+          <div class="weekday">金曜日</div>
+        </div>
+        <div class="timeline-body">
+          <div class="time">10:00 - 12:00</div>
+          <div class="staff">担当：田中 花子</div>
+          <div class="detail">デジタル教材作成支援</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="background:#f9fffe; border: 1px dashed #00897b;">
+      <div style="font-size:13px; color:#00897b; font-weight:600; text-align:center;">
+        &#128712; 2026年6月分は現在調整中です。確定次第こちらに表示されます。
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============================================================ -->
+<!-- SCREEN 2: SA管理画面 - 概要タブ                                 -->
+<!-- ============================================================ -->
+<div class="screen-section">
+  <div class="section-label">
+    <span>SCREEN 2a</span>
+    <span class="badge">SA管理画面</span>
+    <span style="color:rgba(255,255,255,0.5)">概要 Tab</span>
+  </div>
+
+  <div class="topbar" style="padding-right:0;">
+    <div class="system-name">FSL鹿児島県ICT支援スケジュールシステム</div>
+    <div class="user-info">
+      <div class="avatar" style="background:rgba(255,255,255,0.25);">鈴</div>
+      <span>鈴木主任（SA管理者）</span>
+      <button class="logout-btn">ログアウト</button>
+    </div>
+  </div>
+
+  <div class="sa-nav">
+    <div class="nav-item active">概要</div>
+    <div class="nav-item">候補日管理</div>
+    <div class="nav-item">スケジュール調整</div>
+    <div class="nav-item">マスタ</div>
+    <div class="nav-item">設定</div>
+  </div>
+
+  <div class="content-area">
+    <div class="grid-2col">
+      <!-- Left column -->
+      <div>
+        <div class="card">
+          <div class="card-title">
+            <div class="icon">&#128202;</div>
+            入力状況（2026年6月分）
+          </div>
+          <div class="progress-container">
+            <div class="progress-label">
+              <span>入力済み 65 / 80校</span>
+              <span style="font-weight:700; color:#00897b;">81%</span>
+            </div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width:81%"></div>
+            </div>
+          </div>
+          <div style="font-size:11px; color:#999; margin-top:6px;">締切まであと <strong style="color:#e65100;">3日</strong></div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <div class="icon">&#9888;</div>
+            アラート
+          </div>
+          <div class="alert-item warn">
+            <div class="alert-icon">!</div>
+            <div>
+              <strong>未入力校：15校</strong>
+              <div style="font-size:11px; color:#999;">博多中, 東住吉小, 千代小 他12校</div>
+            </div>
+          </div>
+          <div class="alert-item error">
+            <div class="alert-icon">!</div>
+            <div>
+              <strong>日程競合：3件</strong>
+              <div style="font-size:11px; color:#999;">6/9 佐藤：博多小 vs 東住吉小</div>
+            </div>
+          </div>
+          <div class="alert-item info" style="background:#e8f5e9; color:#2e7d32;">
+            <div class="alert-icon" style="background:#c8e6c9;">&#10003;</div>
+            <div>
+              <strong>自動割り当て完了：52校</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="action-row">
+          <button class="btn btn-primary btn-sm">&#9888; 未入力校に催促</button>
+          <button class="btn btn-outline btn-sm">&#128230; CSVエクスポート</button>
+          <button class="btn btn-gray btn-sm">&#128260; 自動割り当て実行</button>
+        </div>
+      </div>
+
+      <!-- Right column -->
+      <div>
+        <div class="card">
+          <div class="card-title">
+            <div class="icon">&#128200;</div>
+            割り当て状況
+          </div>
+          <div class="donut-wrap">
+            <div class="donut">
+              <div class="donut-hole">55%</div>
+            </div>
+            <div class="donut-legend">
+              <div><div class="dot" style="background:#00897b"></div>割り当て済み（44校）</div>
+              <div><div class="dot" style="background:#ffb74d"></div>調整中（16校）</div>
+              <div><div class="dot" style="background:#e0e0e0"></div>未着手（20校）</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <div class="icon">&#128101;</div>
+            支援員稼働状況
+          </div>
+          <div style="font-size:12px;">
+            <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #f0f0f0;">
+              <span><span style="display:inline-block;width:10px;height:10px;background:#00897b;border-radius:50%;margin-right:6px;"></span>佐藤 太郎</span>
+              <span style="color:#00897b; font-weight:600;">18校 / 20校</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #f0f0f0;">
+              <span><span style="display:inline-block;width:10px;height:10px;background:#5c6bc0;border-radius:50%;margin-right:6px;"></span>田中 花子</span>
+              <span style="color:#5c6bc0; font-weight:600;">15校 / 20校</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #f0f0f0;">
+              <span><span style="display:inline-block;width:10px;height:10px;background:#ef6c00;border-radius:50%;margin-right:6px;"></span>高橋 次郎</span>
+              <span style="color:#ef6c00; font-weight:600;">11校 / 20校</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; padding:6px 0;">
+              <span><span style="display:inline-block;width:10px;height:10px;background:#bdbdbd;border-radius:50%;margin-right:6px;"></span>伊藤 美咲</span>
+              <span style="color:#bdbdbd; font-weight:600;">0校 / 20校</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============================================================ -->
+<!-- SCREEN 2b: SA管理画面 - スケジュール調整タブ                     -->
+<!-- ============================================================ -->
+<div class="screen-section">
+  <div class="section-label">
+    <span>SCREEN 2b</span>
+    <span class="badge">SA管理画面</span>
+    <span style="color:rgba(255,255,255,0.5)">スケジュール調整 Tab</span>
+  </div>
+
+  <div class="topbar" style="padding-right:0;">
+    <div class="system-name">FSL鹿児島県ICT支援スケジュールシステム</div>
+    <div class="user-info">
+      <div class="avatar" style="background:rgba(255,255,255,0.25);">鈴</div>
+      <span>鈴木主任（SA管理者）</span>
+      <button class="logout-btn">ログアウト</button>
+    </div>
+  </div>
+
+  <div class="sa-nav">
+    <div class="nav-item">概要</div>
+    <div class="nav-item">候補日管理</div>
+    <div class="nav-item active">スケジュール調整</div>
+    <div class="nav-item">マスタ</div>
+    <div class="nav-item">設定</div>
+  </div>
+
+  <div class="content-area">
+    <div class="split-view">
+      <!-- Left: Calendar -->
+      <div class="card">
+        <div class="month-header">
+          <div class="month-nav"><button>&lt;</button></div>
+          <h3>2026年 6月</h3>
+          <div class="month-nav"><button>&gt;</button></div>
+        </div>
+        <div class="calendar-grid">
+          <div class="cal-header">日</div>
+          <div class="cal-header">月</div>
+          <div class="cal-header">火</div>
+          <div class="cal-header">水</div>
+          <div class="cal-header">木</div>
+          <div class="cal-header">金</div>
+          <div class="cal-header">土</div>
+
+          <div class="cal-cell empty"></div>
+          <div class="staff-cal-cell">
+            <div class="cell-date">1</div>
+            <div class="cell-event">博多小</div>
+            <div class="cell-event" style="border-left-color:#5c6bc0; background:#ede7f6; color:#4527a0;">千代小</div>
+          </div>
+          <div class="staff-cal-cell">
+            <div class="cell-date">2</div>
+            <div class="cell-event">東住吉小</div>
+          </div>
+          <div class="staff-cal-cell">
+            <div class="cell-date" style="color:#7b1fa2;">3</div>
+            <div class="cell-event" style="border-left-color:#7b1fa2; background:#f3e5f5; color:#7b1fa2;">定例会</div>
+          </div>
+          <div class="staff-cal-cell">
+            <div class="cell-date">4</div>
+            <div class="cell-event" style="border-left-color:#ef6c00; background:#fff3e0; color:#e65100;">大名小</div>
+          </div>
+          <div class="staff-cal-cell">
+            <div class="cell-date">5</div>
+            <div class="cell-event">春吉小</div>
+          </div>
+          <div class="cal-cell weekend" style="font-size:12px;">6</div>
+
+          <div class="cal-cell weekend" style="font-size:12px;">7</div>
+          <div class="staff-cal-cell">
+            <div class="cell-date">8</div>
+            <div class="cell-event">住吉中</div>
+          </div>
+          <div class="staff-cal-cell" style="border:2px solid #e53935;">
+            <div class="cell-date" style="color:#e53935;">9</div>
+            <div class="cell-event" style="border-left-color:#e53935; background:#ffebee; color:#c62828;">競合!</div>
+          </div>
+          <div class="staff-cal-cell">
+            <div class="cell-date">10</div>
+          </div>
+          <div class="staff-cal-cell">
+            <div class="cell-date">11</div>
+            <div class="cell-event" style="border-left-color:#5c6bc0; background:#ede7f6; color:#4527a0;">警固小</div>
+          </div>
+          <div class="staff-cal-cell">
+            <div class="cell-date">12</div>
+            <div class="cell-event">舞鶴小</div>
+          </div>
+          <div class="cal-cell weekend" style="font-size:12px;">13</div>
+
+          <div class="cal-cell weekend" style="font-size:12px;">14</div>
+          <div class="staff-cal-cell"><div class="cell-date">15</div><div class="cell-event">簀子小</div></div>
+          <div class="staff-cal-cell"><div class="cell-date">16</div></div>
+          <div class="staff-cal-cell"><div class="cell-date">17</div><div class="cell-event" style="border-left-color:#7b1fa2; background:#f3e5f5; color:#7b1fa2;">定例会</div></div>
+          <div class="staff-cal-cell"><div class="cell-date">18</div><div class="cell-event">博多小</div></div>
+          <div class="staff-cal-cell"><div class="cell-date">19</div><div class="cell-event" style="border-left-color:#ef6c00; background:#fff3e0; color:#e65100;">席田小</div></div>
+          <div class="cal-cell weekend" style="font-size:12px;">20</div>
+        </div>
+        <div class="legend" style="margin-top:12px;">
+          <div class="legend-item"><div class="legend-dot" style="background:#e0f2f1; border:1px solid #00897b;"></div>佐藤</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#ede7f6; border:1px solid #5c6bc0;"></div>田中</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#fff3e0; border:1px solid #ef6c00;"></div>高橋</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#ffebee; border:1px solid #e53935;"></div>競合</div>
+        </div>
+      </div>
+
+      <!-- Right: School list -->
+      <div>
+        <div class="card">
+          <div class="card-title">
+            <div class="icon">&#128203;</div>
+            学校一覧（6月9日）
+          </div>
+          <div style="font-size:11px; color:#999; margin-bottom:10px;">ドラッグ&amp;ドロップで担当を変更</div>
+
+          <div class="school-item">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="drag-handle">&#9776;</span>
+              <span>福岡市立博多小学校</span>
+            </div>
+            <span class="staff-tag staff-a">佐藤</span>
+          </div>
+          <div class="school-item" style="border-color:#e53935; background:#fff5f5;">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="drag-handle">&#9776;</span>
+              <span>福岡市立東住吉小学校</span>
+              <span style="font-size:10px; color:#e53935; font-weight:700;">&#9888; 競合</span>
+            </div>
+            <span class="staff-tag staff-a">佐藤</span>
+          </div>
+          <div class="school-item">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="drag-handle">&#9776;</span>
+              <span>福岡市立千代小学校</span>
+            </div>
+            <span class="staff-tag staff-b">田中</span>
+          </div>
+          <div class="school-item">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="drag-handle">&#9776;</span>
+              <span>福岡市立大名小学校</span>
+            </div>
+            <span class="staff-tag staff-c">高橋</span>
+          </div>
+          <div class="school-item">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="drag-handle">&#9776;</span>
+              <span>福岡市立春吉小学校</span>
+            </div>
+            <span class="staff-tag staff-unassigned">未割当</span>
+          </div>
+          <div class="school-item">
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="drag-handle">&#9776;</span>
+              <span>福岡市立住吉中学校</span>
+            </div>
+            <span class="staff-tag staff-b">田中</span>
+          </div>
+        </div>
+
+        <div style="text-align:right; margin-top:8px;">
+          <button class="btn btn-outline btn-sm" style="margin-right:6px;">リセット</button>
+          <button class="btn btn-primary btn-sm">割り当て確定</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============================================================ -->
+<!-- SCREEN 3: 支援員向け画面 (Support Staff Screen)                -->
+<!-- ============================================================ -->
+<div class="screen-section">
+  <div class="section-label">
+    <span>SCREEN 3</span>
+    <span class="badge">支援員向け画面</span>
+    <span style="color:rgba(255,255,255,0.5)">Support Staff Screen</span>
+  </div>
+
+  <!-- Minimal header -->
+  <div class="topbar" style="background:#263238;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div class="system-name" style="font-size:14px;">マイスケジュール</div>
+    </div>
+    <div class="user-info">
+      <div class="avatar" style="background:#00897b;">佐</div>
+      <span>佐藤 太郎（ICT支援員）</span>
+      <button class="logout-btn">ログアウト</button>
+    </div>
+  </div>
+
+  <div class="content-area">
+    <!-- Filter + View Toggle Row -->
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+      <div class="filter-chips">
+        <div class="filter-chip">全校</div>
+        <div class="filter-chip active">担当校のみ</div>
+      </div>
+      <div class="view-toggle">
+        <button class="active">週表示</button>
+        <button>月表示</button>
+      </div>
+    </div>
+
+    <!-- Week view header -->
+    <div class="card" style="padding:12px 20px; margin-bottom:12px;">
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <button class="btn btn-gray btn-sm">&lt; 前週</button>
+        <span style="font-size:15px; font-weight:700; color:#333;">2026年6月 第2週（6/8 - 6/12）</span>
+        <button class="btn btn-gray btn-sm">翌週 &gt;</button>
+      </div>
+    </div>
+
+    <!-- Day Cards -->
+    <div class="day-card">
+      <div class="day-header">
+        6月8日
+        <span class="weekday-badge">月曜日</span>
+        <span style="font-size:11px; color:#999; margin-left:auto;">2件の訪問</span>
+      </div>
+      <div class="visit-entry">
+        <div class="visit-time">09:30 - 11:30</div>
+        <div>
+          <div class="visit-school">福岡市立住吉中学校</div>
+          <div class="visit-addr">福岡市博多区住吉4-1-1</div>
+        </div>
+      </div>
+      <div class="visit-entry">
+        <div class="visit-time">13:30 - 15:30</div>
+        <div>
+          <div class="visit-school">福岡市立博多小学校</div>
+          <div class="visit-addr">福岡市博多区博多駅前3-2-8</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="day-card">
+      <div class="day-header">
+        6月9日
+        <span class="weekday-badge">火曜日</span>
+        <span style="font-size:11px; color:#999; margin-left:auto;">1件の訪問</span>
+      </div>
+      <div class="visit-entry">
+        <div class="visit-time">10:00 - 12:00</div>
+        <div>
+          <div class="visit-school">福岡市立東住吉小学校</div>
+          <div class="visit-addr">福岡市博多区美野島1-10-1</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="day-card" style="border-left-color:#e0e0e0; background:#fafafa;">
+      <div class="day-header" style="color:#aaa;">
+        6月10日
+        <span class="weekday-badge" style="background:#f5f5f5; color:#bbb;">水曜日</span>
+        <span style="font-size:11px; color:#ccc; margin-left:auto;">訪問なし</span>
+      </div>
+      <div style="font-size:12px; color:#ccc; padding:6px 0;">予定はありません</div>
+    </div>
+
+    <div class="day-card">
+      <div class="day-header">
+        6月11日
+        <span class="weekday-badge">木曜日</span>
+        <span style="font-size:11px; color:#999; margin-left:auto;">1件の訪問</span>
+      </div>
+      <div class="visit-entry">
+        <div class="visit-time">09:00 - 11:00</div>
+        <div>
+          <div class="visit-school">福岡市立舞鶴小学校</div>
+          <div class="visit-addr">福岡市中央区舞鶴2-6-1</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="day-card">
+      <div class="day-header">
+        6月12日
+        <span class="weekday-badge">金曜日</span>
+        <span style="font-size:11px; color:#999; margin-left:auto;">2件の訪問</span>
+      </div>
+      <div class="visit-entry">
+        <div class="visit-time">09:30 - 11:30</div>
+        <div>
+          <div class="visit-school">福岡市立簀子小学校</div>
+          <div class="visit-addr">福岡市中央区大手門3-3-1</div>
+        </div>
+      </div>
+      <div class="visit-entry">
+        <div class="visit-time">13:00 - 15:00</div>
+        <div>
+          <div class="visit-school">福岡市立警固小学校</div>
+          <div class="visit-addr">福岡市中央区警固1-11-1</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div class="mockup-footer">
+  Design B: タブレイアウト
+</div>
+
+</body>
+</html>

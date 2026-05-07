@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
+    background: #1b2a4a;
+    color: #fff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .dev-badge {
+    background: #ff6d00;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 12px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+    letter-spacing: 1px;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: #a0b4d0;
+    margin-bottom: 32px;
+    text-align: center;
+  }
+  .cards {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 500px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    text-decoration: none;
+    color: #1a1a1a;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  .card-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+  }
+  .label-teacher { background: #1a73e8; }
+  .label-sa { background: #0d904f; }
+  .label-staff { background: #e8710a; }
+  .card-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .card-desc {
+    font-size: 13px;
+    color: #666;
+    line-height: 1.5;
+  }
+  .card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .go-btn {
+    display: inline-block;
+    padding: 6px 18px;
+    background: #1a73e8;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .go-btn:hover { background: #1558b0; }
+  .go-btn.sa { background: #0d904f; }
+  .go-btn.sa:hover { background: #0a7a40; }
+  .go-btn.staff { background: #e8710a; }
+  .go-btn.staff:hover { background: #c56200; }
+  .impersonate-select {
+    width: 100%;
+    margin-top: 10px;
+    padding: 8px 10px;
+    border: 1.5px solid #dadce0;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+    color: #333;
+    background: #f8f9fa;
+  }
+  .impersonate-select:focus {
+    outline: none;
+    border-color: #1a73e8;
+  }
+  .footer {
+    margin-top: 32px;
+    font-size: 12px;
+    color: #5a7a9e;
+    text-align: center;
+  }
+  .footer .email {
+    color: #a0b4d0;
+    font-size: 11px;
+    margin-top: 4px;
+  }
+</style>
+</head>
+<body>
+  <div class="dev-badge">DEV MODE</div>
+  <h1>FSL鹿児島県ICT支援スケジュールシステム</h1>
+  <div class="subtitle">ロールを選択してください</div>
+
+  <div class="cards">
+    <!-- Teacher -->
+    <div class="card">
+      <div class="card-top">
+        <div>
+          <span class="card-label label-teacher">Teacher</span>
+          <div class="card-title">先生向け画面</div>
+          <div class="card-desc">候補日の入力・送信を行います。初回はユーザー登録画面が表示されます。</div>
+        </div>
+        <button class="go-btn" onclick="goAs('teacher')">&#8594;</button>
+      </div>
+      <select class="impersonate-select" id="sel-teacher">
+        <option value="">--- なりすまし先を選択 ---</option>
+      </select>
+    </div>
+
+    <!-- SA -->
+    <div class="card">
+      <div class="card-top">
+        <div>
+          <span class="card-label label-sa">SA</span>
+          <div class="card-title">SA管理画面</div>
+          <div class="card-desc">候補日の一覧確認、システム設定、スケジュール調整を行います。</div>
+        </div>
+        <button class="go-btn sa" onclick="goAs('sa')">&#8594;</button>
+      </div>
+      <select class="impersonate-select" id="sel-sa">
+        <option value="">--- なりすまし先を選択 ---</option>
+      </select>
+    </div>
+
+    <!-- Staff -->
+    <div class="card">
+      <div class="card-top">
+        <div>
+          <span class="card-label label-staff">Staff</span>
+          <div class="card-title">支援員向け画面</div>
+          <div class="card-desc">訪問スケジュールの確認を行います（閲覧専用）。</div>
+        </div>
+        <button class="go-btn staff" onclick="goAs('staff')">&#8594;</button>
+      </div>
+      <select class="impersonate-select" id="sel-staff">
+        <option value="">--- なりすまし先を選択 ---</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="footer">
+    開発モード - システム設定シートで「開発モード」をOFFにすると非表示になります
+    <div class="email"><?= email ?></div>
+  </div>
+
+<script>
+  var baseUrl = <?!= JSON.stringify(baseUrl) ?>;
+  var accounts = JSON.parse(<?!= JSON.stringify(accountList) ?>);
+
+  document.addEventListener('DOMContentLoaded', function() {
+    populateSelect('sel-sa', accounts.sa);
+    populateSelect('sel-staff', accounts.staff);
+    populateSelect('sel-teacher', accounts.teacher);
+  });
+
+  function populateSelect(id, list) {
+    var sel = document.getElementById(id);
+    for (var i = 0; i < list.length; i++) {
+      var opt = document.createElement('option');
+      opt.value = list[i].email;
+      opt.textContent = list[i].name + '  [' + list[i].email + ']';
+      sel.appendChild(opt);
+    }
+  }
+
+  function goAs(role) {
+    var sel = document.getElementById('sel-' + role);
+    var impersonate = sel.value;
+    var url = baseUrl + '?role=' + role;
+    if (impersonate) url += '&impersonate=' + encodeURIComponent(impersonate);
+    window.top.location.href = url;
+  }
+</script>
+</body>
+</html>

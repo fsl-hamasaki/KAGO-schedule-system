@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
+    background: #f0f2f5;
+    color: #202124;
+    line-height: 1.6;
+  }
+  .app-header {
+    background: #fff;
+    border-bottom: 1px solid #dadce0;
+    padding: 12px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .app-header .logo { font-size: 1.1rem; font-weight: 700; color: #e8710a; }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .role-badge { background: #e8710a; color: #fff; font-size: 0.72rem; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+  .back-link { font-size: 0.82rem; color: #1a73e8; text-decoration: none; }
+  .back-link:hover { text-decoration: underline; }
+
+  .container { max-width: 1000px; margin: 0 auto; padding: 24px 20px; }
+  .page-title { font-size: 1.3rem; font-weight: 700; color: #202124; margin-bottom: 6px; }
+  .page-subtitle { font-size: 0.82rem; color: #5f6368; margin-bottom: 24px; }
+
+  .card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .card-title { font-size: 1rem; font-weight: 700; margin-bottom: 16px; color: #202124; }
+
+  /* Calendar */
+  .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .cal-nav-btn {
+    background: #fff; border: 1.5px solid #dadce0; border-radius: 6px;
+    padding: 6px 14px; cursor: pointer; font-size: 0.9rem; color: #202124;
+  }
+  .cal-nav-btn:hover { background: #f0f2f5; }
+  .cal-title { font-size: 1.05rem; font-weight: 700; color: #202124; }
+
+  .mini-cal { width: 100%; border-collapse: collapse; max-width: 500px; margin: 0 auto; }
+  .mini-cal th { font-size: 0.75rem; color: #5f6368; padding: 6px 0; text-align: center; font-weight: 600; }
+  .mini-cal td { text-align: center; padding: 7px 0; font-size: 0.82rem; border-radius: 6px; }
+  .mini-cal td.weekend { color: #d93025; background: #fce8e6; }
+  .mini-cal td.holiday { color: #e8710a; background: #fef7e0; }
+  .mini-cal td.staff-off { color: #9334e6; background: #f3e8fd; }
+  .mini-cal td.staff-off-pending { color: #b06000; background: #fff8e1; outline: 1px dashed #f9ab00; outline-offset: -2px; }
+  .mini-cal td.available { color: #137333; font-weight: 700; background: #e6f4ea; }
+  .mini-cal td.empty { background: none; }
+
+  /* Leave Request Form */
+  .leave-form-row { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; margin-bottom: 14px; }
+  .leave-input { padding: 8px 10px; border: 1.5px solid #dadce0; border-radius: 6px; font-size: 0.9rem; font-family: inherit; }
+  .leave-input:focus { outline: none; border-color: #1a73e8; }
+  .leave-label { display: block; font-size: 0.78rem; color: #5f6368; margin-bottom: 4px; }
+  .btn { padding: 9px 18px; border: none; border-radius: 6px; font-size: 0.88rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+  .btn-primary { background: #1a73e8; color: #fff; }
+  .btn-primary:hover { background: #1558b0; }
+  .btn-primary:disabled { background: #9aa0a6; cursor: not-allowed; }
+  .btn-outline { background: #fff; color: #d93025; border: 1.5px solid #d93025; padding: 5px 12px; font-size: 0.8rem; }
+  .btn-outline:hover { background: #fce8e6; }
+  .msg { padding: 8px 12px; border-radius: 6px; font-size: 0.85rem; }
+  .msg.success { background: #e6f4ea; color: #137333; }
+  .msg.error { background: #fce8e6; color: #d93025; }
+  .status-badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 700; }
+  .status-pending { background: #fff8e1; color: #b06000; border: 1px solid #f9ab00; }
+  .status-approved { background: #e6f4ea; color: #137333; border: 1px solid #34a853; }
+  .status-rejected { background: #fce8e6; color: #d93025; border: 1px solid #d93025; }
+
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; justify-content: center; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 0.72rem; color: #5f6368; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 4px; flex-shrink: 0; }
+
+  /* Stats */
+  .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); padding: 20px 24px; text-align: center; }
+  .stat-value { font-size: 2rem; font-weight: 800; color: #e8710a; }
+  .stat-label { font-size: 0.82rem; color: #5f6368; margin-top: 2px; }
+
+  /* Table */
+  .data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .data-table th { text-align: left; padding: 10px 14px; background: #f8f9fa; color: #5f6368; font-weight: 600; border-bottom: 2px solid #e0e0e0; font-size: 0.78rem; white-space: nowrap; }
+  .data-table td { padding: 10px 14px; border-bottom: 1px solid #f0f0f0; }
+  .data-table tr:hover td { background: #f8f9fa; }
+  .tag { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
+
+  .empty-state { text-align: center; padding: 40px 20px; color: #9aa0a6; }
+  .empty-state .icon { font-size: 2.5rem; margin-bottom: 8px; opacity: 0.4; }
+  .info-box { background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; padding: 14px 18px; font-size: 0.85rem; color: #f57f17; margin-bottom: 20px; }
+  .footer { text-align: center; padding: 20px; font-size: 0.78rem; color: #9aa0a6; }
+
+  @media (max-width: 700px) { .stats-row { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+  <div class="app-header">
+    <div class="logo">FSL鹿児島県ICT支援スケジュールシステム</div>
+    <div class="header-right">
+      <span class="role-badge">ICT支援員</span>
+      <a class="back-link" href="<?= baseUrl ?>" target="_top">&#8592; トップに戻る</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <h2 class="page-title" id="staffTitle">訪問スケジュール</h2>
+    <p class="page-subtitle" id="pageSubtitle"></p>
+
+    <div class="stats-row" id="statsRow"></div>
+
+    <!-- Calendar -->
+    <div class="card">
+      <div class="cal-nav">
+        <button class="cal-nav-btn" onclick="changeMonth(-1)">&#9664;</button>
+        <span class="cal-title" id="calTitle"></span>
+        <button class="cal-nav-btn" onclick="changeMonth(1)">&#9654;</button>
+      </div>
+      <div id="calArea"></div>
+    </div>
+
+    <!-- Leave Request -->
+    <div class="card">
+      <div class="card-title">休み申請</div>
+      <p style="font-size:0.85rem; color:#5f6368; margin-bottom:14px;">
+        休みたい日付を申請してください。SAの承認後、カレンダー・自動割当に反映されます。
+      </p>
+      <div class="leave-form-row">
+        <div>
+          <label class="leave-label">日付</label>
+          <input type="date" id="leaveDate" class="leave-input">
+        </div>
+        <div style="flex:1; min-width:200px;">
+          <label class="leave-label">備考（任意）</label>
+          <input type="text" id="leaveNote" class="leave-input" placeholder="例：研修参加" style="width:100%;">
+        </div>
+        <button class="btn btn-primary" id="submitLeaveBtn" onclick="submitLeaveRequest()">申請する</button>
+      </div>
+      <div id="leaveMessage" style="margin-bottom:10px;"></div>
+
+      <h4 style="font-size:0.9rem; font-weight:700; color:#202124; margin:18px 0 10px;">あなたの申請履歴</h4>
+      <div id="myLeaveList"></div>
+    </div>
+
+    <!-- Candidates Table -->
+    <div class="card">
+      <div class="card-title">入力済み候補日一覧</div>
+      <div id="candidatesArea"></div>
+    </div>
+  </div>
+
+  <div class="footer">FSL鹿児島県ICT支援スケジュールシステム - 支援員向け画面</div>
+
+  <!-- Comment Modal -->
+  <div id="commentModal" onclick="closeCommentModal(event)" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); z-index:100; align-items:center; justify-content:center;">
+    <div onclick="event.stopPropagation()" style="background:#fff; border-radius:12px; box-shadow:0 8px 30px rgba(0,0,0,0.2); padding:28px; max-width:700px; width:90%; max-height:80vh; overflow-y:auto;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+        <h3 id="commentModalTitle" style="font-size:1rem; font-weight:700; color:#202124;"></h3>
+        <button onclick="closeCommentModal()" style="background:none; border:none; font-size:1.3rem; cursor:pointer; color:#5f6368; padding:4px 8px; border-radius:6px;">&times;</button>
+      </div>
+      <div id="commentModalBody"></div>
+    </div>
+  </div>
+
+<script>
+  var settings = JSON.parse(<?!= JSON.stringify(settings) ?>);
+  var candidates = JSON.parse(<?!= JSON.stringify(candidates) ?>);
+  var mySchedule = JSON.parse(<?!= JSON.stringify(mySchedule) ?>);
+  var myStaffName = <?!= JSON.stringify(myStaffName) ?>;
+  var currentEmail = <?!= JSON.stringify(email) ?>;
+  var saHolidays = JSON.parse(<?!= JSON.stringify(holidays) ?>);
+  var saMeetings = JSON.parse(<?!= JSON.stringify(meetings) ?>);
+  var saStaffOff = JSON.parse(<?!= JSON.stringify(staffOff) ?>);
+
+  // 祝日
+  var JP_HOLIDAYS = {
+    '2026-01-01':'元日','2026-01-12':'成人の日','2026-02-11':'建国記念の日','2026-02-23':'天皇誕生日',
+    '2026-03-20':'春分の日','2026-04-29':'昭和の日','2026-05-03':'憲法記念日','2026-05-04':'みどりの日',
+    '2026-05-05':'こどもの日','2026-05-06':'振替休日','2026-07-20':'海の日','2026-08-11':'山の日',
+    '2026-09-21':'敬老の日','2026-09-23':'秋分の日','2026-10-12':'スポーツの日',
+    '2026-11-03':'文化の日','2026-11-23':'勤労感謝の日',
+    '2027-01-01':'元日','2027-01-11':'成人の日','2027-02-11':'建国記念の日','2027-02-23':'天皇誕生日','2027-03-21':'春分の日'
+  };
+  // SA設定の休日をマージ
+  for (var hi = 0; hi < saHolidays.length; hi++) JP_HOLIDAYS[saHolidays[hi].date] = saHolidays[hi].name || '特別休日';
+  var meetingMap = {};
+  for (var mi = 0; mi < saMeetings.length; mi++) meetingMap[saMeetings[mi].date] = saMeetings[mi].name || '定例会';
+  // 自分の休日をステータス別マップに
+  var myStaffOffStatus = {}; // date -> '承認済'|'申請中'|'却下'
+  for (var si = 0; si < saStaffOff.length; si++) {
+    if (saStaffOff[si].staffName === myStaffName) {
+      // 同日複数（理論上ないが）→承認済優先
+      var prev = myStaffOffStatus[saStaffOff[si].date];
+      if (prev !== '承認済') myStaffOffStatus[saStaffOff[si].date] = saStaffOff[si].status;
+    }
+  }
+
+  // スケジュールを日付マップに
+  var schedMap = {};
+  for (var i = 0; i < mySchedule.length; i++) {
+    var s = mySchedule[i];
+    if (!schedMap[s.date]) schedMap[s.date] = [];
+    schedMap[s.date].push(s);
+  }
+
+  var calYear, calMonth;
+
+  document.addEventListener('DOMContentLoaded', function() {
+    if (settings.targetMonth) {
+      var p = settings.targetMonth.split('-');
+      calYear = parseInt(p[0],10);
+      calMonth = parseInt(p[1],10);
+    } else {
+      var now = new Date();
+      calYear = now.getFullYear();
+      calMonth = now.getMonth() + 1;
+    }
+    var label = settings.targetMonth ? formatMonth(settings.targetMonth) : '';
+    document.getElementById('pageSubtitle').textContent = label;
+    if (myStaffName) {
+      document.getElementById('staffTitle').textContent = myStaffName + ' - 訪問スケジュール';
+    }
+    renderStats();
+    renderCalendar();
+    renderCandidates();
+    renderMyLeaveList();
+  });
+
+  function renderMyLeaveList() {
+    var area = document.getElementById('myLeaveList');
+    if (!myStaffName) {
+      area.innerHTML = '<p style="font-size:0.85rem; color:#9aa0a6;">支援員として認識されていません。</p>';
+      return;
+    }
+    var mine = saStaffOff.filter(function(s) { return s.staffName === myStaffName; });
+    // 日付昇順
+    mine.sort(function(a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+    if (mine.length === 0) {
+      area.innerHTML = '<p style="font-size:0.85rem; color:#9aa0a6;">申請履歴はまだありません。</p>';
+      return;
+    }
+    var html = '<table class="data-table"><thead><tr>' +
+      '<th>日付</th><th>備考</th><th>ステータス</th><th>備考・操作</th>' +
+      '</tr></thead><tbody>';
+    for (var i = 0; i < mine.length; i++) {
+      var s = mine[i];
+      var badge = '<span class="status-badge ' +
+        (s.status === '承認済' ? 'status-approved' :
+         s.status === '申請中' ? 'status-pending' : 'status-rejected') +
+        '">' + esc(s.status) + '</span>';
+      var actionCell = '';
+      if (s.status === '申請中') {
+        actionCell = '<button class="btn btn-outline" onclick="withdrawLeave(\'' + esc(s.date) + '\')">取り下げ</button>';
+      } else if (s.status === '却下') {
+        actionCell = '<span style="font-size:0.8rem; color:#d93025;">却下理由: ' + esc(s.rejectReason || '（理由未記入）') + '</span>';
+      } else {
+        actionCell = '<span style="font-size:0.78rem; color:#9aa0a6;">取り下げにはSAへ連絡</span>';
+      }
+      html += '<tr>' +
+        '<td style="white-space:nowrap; font-weight:600;">' + esc(formatDateLabel(s.date)) + '</td>' +
+        '<td>' + esc(s.note || '-') + '</td>' +
+        '<td>' + badge + '</td>' +
+        '<td>' + actionCell + '</td>' +
+        '</tr>';
+    }
+    html += '</tbody></table>';
+    area.innerHTML = html;
+  }
+
+  function formatDateLabel(ds) {
+    if (!ds) return '';
+    var p = ds.split('-');
+    if (p.length !== 3) return ds;
+    var d = new Date(parseInt(p[0],10), parseInt(p[1],10)-1, parseInt(p[2],10));
+    var dow = ['日','月','火','水','木','金','土'][d.getDay()];
+    return parseInt(p[1],10) + '/' + parseInt(p[2],10) + '（' + dow + '）';
+  }
+
+  function submitLeaveRequest() {
+    var dateInput = document.getElementById('leaveDate');
+    var noteInput = document.getElementById('leaveNote');
+    var msg = document.getElementById('leaveMessage');
+    msg.innerHTML = '';
+
+    if (!dateInput.value) {
+      msg.innerHTML = '<div class="msg error">日付を入力してください。</div>';
+      return;
+    }
+    if (!myStaffName) {
+      msg.innerHTML = '<div class="msg error">支援員として認識されていません。SAにご相談ください。</div>';
+      return;
+    }
+
+    var btn = document.getElementById('submitLeaveBtn');
+    btn.disabled = true;
+    btn.textContent = '申請中...';
+
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result.success) {
+          msg.innerHTML = '<div class="msg success">' + esc(result.message) + '</div>';
+          // 即座に画面に追加（再ロードはせず追加表示）
+          saStaffOff.push({
+            date: dateInput.value,
+            staffName: myStaffName,
+            note: noteInput.value.trim(),
+            status: '申請中',
+            rejectReason: '',
+            requesterEmail: currentEmail,
+            requestedAt: ''
+          });
+          if (myStaffOffStatus[dateInput.value] !== '承認済') {
+            myStaffOffStatus[dateInput.value] = '申請中';
+          }
+          dateInput.value = '';
+          noteInput.value = '';
+          renderMyLeaveList();
+          renderCalendar();
+        } else {
+          msg.innerHTML = '<div class="msg error">' + esc(result.message) + '</div>';
+        }
+        btn.disabled = false;
+        btn.textContent = '申請する';
+      })
+      .withFailureHandler(function(err) {
+        msg.innerHTML = '<div class="msg error">エラー: ' + esc(err.message) + '</div>';
+        btn.disabled = false;
+        btn.textContent = '申請する';
+      })
+      .requestStaffOff({
+        date: dateInput.value,
+        note: noteInput.value.trim(),
+        impersonate: currentEmail
+      });
+  }
+
+  function withdrawLeave(dateStr) {
+    if (!confirm(formatDateLabel(dateStr) + ' の申請を取り下げますか？')) return;
+    var msg = document.getElementById('leaveMessage');
+    msg.innerHTML = '';
+
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result.success) {
+          msg.innerHTML = '<div class="msg success">' + esc(result.message) + '</div>';
+          // ローカル状態を更新
+          saStaffOff = saStaffOff.filter(function(s) {
+            return !(s.staffName === myStaffName && s.date === dateStr && s.status === '申請中');
+          });
+          if (myStaffOffStatus[dateStr] === '申請中') {
+            delete myStaffOffStatus[dateStr];
+          }
+          renderMyLeaveList();
+          renderCalendar();
+        } else {
+          msg.innerHTML = '<div class="msg error">' + esc(result.message) + '</div>';
+        }
+      })
+      .withFailureHandler(function(err) {
+        msg.innerHTML = '<div class="msg error">エラー: ' + esc(err.message) + '</div>';
+      })
+      .withdrawStaffOff({ date: dateStr, impersonate: currentEmail });
+  }
+
+  function changeMonth(delta) {
+    calMonth += delta;
+    if (calMonth > 12) { calMonth = 1; calYear++; }
+    if (calMonth < 1) { calMonth = 12; calYear--; }
+    renderCalendar();
+  }
+
+  function renderStats() {
+    var total = candidates.length;
+    var withIctRequest = candidates.filter(function(c) { return c.ictRequest && String(c.ictRequest).trim(); }).length;
+    var wantSecond = candidates.filter(function(c) { return c.wantSecond; }).length;
+    document.getElementById('statsRow').innerHTML =
+      '<div class="stat-card"><div class="stat-value">' + total + '</div><div class="stat-label">入力済み学校数</div></div>' +
+      '<div class="stat-card"><div class="stat-value" style="color:#1a73e8;">' + wantSecond + '</div><div class="stat-label">2回目希望</div></div>' +
+      '<div class="stat-card" style="cursor:pointer;" onclick="showCommentList()"><div class="stat-value" style="color:#1a73e8;">' + withIctRequest + '</div><div class="stat-label">ICT支援要望あり</div></div>';
+  }
+
+  function renderCalendar() {
+    var year = calYear, month = calMonth;
+    document.getElementById('calTitle').textContent = year + '年' + month + '月';
+
+    var firstDay = new Date(year, month-1, 1);
+    var lastDay = new Date(year, month, 0);
+    var startDow = firstDay.getDay();
+    var daysInMonth = lastDay.getDate();
+
+    var html = '<table class="mini-cal"><thead><tr>';
+    ['日','月','火','水','木','金','土'].forEach(function(d) { html += '<th>' + d + '</th>'; });
+    html += '</tr></thead><tbody><tr>';
+    for (var i = 0; i < startDow; i++) html += '<td class="empty"></td>';
+    var cc = startDow;
+    for (var d = 1; d <= daysInMonth; d++) {
+      var ds = year+'-'+String(month).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      var dow = new Date(year,month-1,d).getDay();
+      var cls = '';
+      if (dow===0||dow===6) cls = 'weekend';
+      else if (JP_HOLIDAYS[ds] || meetingMap[ds]) cls = 'holiday';
+      else if (myStaffOffStatus[ds] === '承認済') cls = 'staff-off';
+      else if (myStaffOffStatus[ds] === '申請中') cls = 'staff-off-pending';
+      else cls = 'available';
+      html += '<td class="'+cls+'" style="vertical-align:top; height:50px;">';
+      html += '<div style="font-size:0.72rem; color:#5f6368; margin-bottom:2px;">' + d + '</div>';
+      if (schedMap[ds]) {
+        for (var j = 0; j < schedMap[ds].length; j++) {
+          var entry = schedMap[ds][j];
+          var schoolShort = entry.schoolName.replace('中学校', '');
+          var isDelegated = (entry.origStaff === myStaffName && entry.staffName !== myStaffName);
+          var isSubstitute = (entry.origStaff && entry.origStaff !== myStaffName && entry.staffName === myStaffName);
+          var chipStyle = 'display:inline-block; padding:1px 5px; border-radius:3px; font-size:0.62rem; font-weight:600; margin:1px 0;';
+          if (isDelegated) {
+            chipStyle += 'background:#f8f9fa; color:#5f6368; border:1px dashed #9aa0a6; opacity:0.7;';
+            html += '<div style="' + chipStyle + '" title="代行: ' + esc(entry.staffName) + '">' + esc(schoolShort) + ' →' + esc(entry.staffName.split(/[\s　]/)[0]) + '</div>';
+          } else if (isSubstitute) {
+            chipStyle += 'background:#fff3e0; color:#e65100;';
+            html += '<div style="' + chipStyle + '" title="' + esc(entry.origStaff) + 'の代行">' + esc(schoolShort) + ' (代行)</div>';
+          } else {
+            chipStyle += 'background:#e8f0fe; color:#1a73e8;';
+            html += '<div style="' + chipStyle + '">' + esc(schoolShort) + '</div>';
+          }
+        }
+      }
+      html += '</td>';
+      cc++;
+      if (cc%7===0 && d<daysInMonth) html += '</tr><tr>';
+    }
+    var rem = 7-(cc%7); if(rem<7) for(var i=0;i<rem;i++) html+='<td class="empty"></td>';
+    html += '</tr></tbody></table>';
+    html += '<div class="legend">';
+    html += '<div class="legend-item"><div class="legend-dot" style="background:#e6f4ea;border:1px solid #137333;"></div>稼働日</div>';
+    html += '<div class="legend-item"><div class="legend-dot" style="background:#fce8e6;"></div>土日</div>';
+    html += '<div class="legend-item"><div class="legend-dot" style="background:#fef7e0;"></div>祝日・定例会</div>';
+    html += '<div class="legend-item"><div class="legend-dot" style="background:#f3e8fd;"></div>休日（承認済）</div>';
+    html += '<div class="legend-item"><div class="legend-dot" style="background:#fff8e1; outline:1px dashed #f9ab00;"></div>休日（申請中）</div>';
+    html += '<div class="legend-item"><div class="legend-dot" style="background:#e8f0fe;border:1px solid #1a73e8;"></div>訪問</div>';
+    html += '<div class="legend-item"><div class="legend-dot" style="background:#fff3e0;border:1px solid #e65100;"></div>代行</div>';
+    html += '</div>';
+    document.getElementById('calArea').innerHTML = html;
+  }
+
+  function renderCandidates() {
+    var area = document.getElementById('candidatesArea');
+    if (candidates.length === 0) {
+      area.innerHTML = '<div class="empty-state"><div class="icon">&#128197;</div><div>まだ候補日の入力がありません</div></div>';
+      return;
+    }
+    var html = '<table class="data-table"><thead><tr>' +
+      '<th>学校名</th><th>担当者</th>' +
+      '<th>1回目 第1</th><th>1回目 第2</th><th>1回目 第3</th>' +
+      '<th>2回目 第1</th><th>2回目 第2</th><th>2回目 第3</th>' +
+      '<th>3回目</th><th>ICT支援要望</th><th>送信日</th>' +
+      '</tr></thead><tbody>';
+    for (var i = 0; i < candidates.length; i++) {
+      var c = candidates[i];
+      var ict = c.ictRequest && String(c.ictRequest).trim() ? esc(c.ictRequest) : '-';
+      html += '<tr>' +
+        '<td style="font-weight:600;">' + esc(c.schoolName) + '</td>' +
+        '<td>' + esc(c.name) + '</td>' +
+        '<td>' + fmtVal(c.v1c1) + '</td><td>' + fmtVal(c.v1c2) + '</td><td>' + fmtVal(c.v1c3) + '</td>' +
+        '<td>' + fmtVal(c.v2c1) + '</td><td>' + fmtVal(c.v2c2) + '</td><td>' + fmtVal(c.v2c3) + '</td>' +
+        '<td>' + (c.wantThird ? '<span class="tag" style="background:#e8f0fe;color:#1a73e8;">希望</span>' : '-') + '</td>' +
+        '<td style="max-width:280px; font-size:0.8rem; line-height:1.5;">' + ict + '</td>' +
+        '<td style="white-space:nowrap;font-size:0.78rem;">' + esc(c.submittedAt) + '</td>' +
+        '</tr>';
+    }
+    html += '</tbody></table>';
+    area.innerHTML = html;
+  }
+
+  function fmtVal(val) {
+    if (!val || val === 'undefined') return '-';
+    if (val === '特に指定しない') return '<span class="tag" style="background:#fff3e0;color:#e65100;">指定なし</span>';
+    var p = val.split('-');
+    if (p.length === 3) return parseInt(p[1],10) + '/' + parseInt(p[2],10);
+    return esc(val);
+  }
+  function formatMonth(ym) { var p=ym.split('-'); return p.length===2 ? p[0]+'年'+parseInt(p[1],10)+'月分' : ym; }
+  function showCommentList() {
+    var commented = candidates.filter(function(c) { return c.ictRequest && String(c.ictRequest).trim(); });
+    if (commented.length === 0) return;
+    document.getElementById('commentModalTitle').textContent = 'ICT支援に関するご要望（' + commented.length + '件）';
+    var html = '<table class="data-table" style="font-size:0.82rem;"><thead><tr>' +
+      '<th>学校名</th><th>氏名</th><th>ICT支援要望</th></tr></thead><tbody>';
+    for (var i = 0; i < commented.length; i++) {
+      var c = commented[i];
+      html += '<tr><td style="font-weight:600;white-space:nowrap;">' + esc(c.schoolName) + '</td>' +
+        '<td style="white-space:nowrap;">' + esc(c.name) + '</td>' +
+        '<td>' + esc(c.ictRequest) + '</td></tr>';
+    }
+    html += '</tbody></table>';
+    document.getElementById('commentModalBody').innerHTML = html;
+    document.getElementById('commentModal').style.display = 'flex';
+  }
+
+  function closeCommentModal(e) {
+    if (!e || e.target === document.getElementById('commentModal')) {
+      document.getElementById('commentModal').style.display = 'none';
+    }
+  }
+
+  function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+</script>
+</body>
+</html>

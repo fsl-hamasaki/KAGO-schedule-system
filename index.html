@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", Meiryo, sans-serif;
+    background: #1b2a4a;
+    color: #fff;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  h1 {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: #a0b4d0;
+    margin-bottom: 32px;
+    text-align: center;
+  }
+  .cards {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    width: 100%;
+    max-width: 500px;
+  }
+  .card {
+    display: block;
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    text-decoration: none;
+    color: #1a1a1a;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  }
+  .card-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 20px;
+    margin-bottom: 10px;
+  }
+  .card:nth-child(1) .card-label { background: #1a73e8; }
+  .card:nth-child(2) .card-label { background: #00897b; }
+  .card:nth-child(3) .card-label { background: #ff6d00; }
+  .card-title {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .card-desc {
+    font-size: 13px;
+    color: #666;
+    line-height: 1.5;
+  }
+  .card-arrow {
+    float: right;
+    font-size: 20px;
+    color: #ccc;
+    margin-top: -30px;
+  }
+  .footer {
+    margin-top: 32px;
+    font-size: 12px;
+    color: #5a7a9e;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+  <h1>FSL鹿児島県ICT支援スケジュールシステム</h1>
+  <div class="subtitle">UIモックアップ確認（3案）</div>
+
+  <div class="cards">
+    <a class="card" href="<?= baseUrl ?>?page=A" target="_top">
+      <span class="card-label">Design A</span>
+      <div class="card-title">カードレイアウト</div>
+      <div class="card-desc">
+        Google風のクリーンなカードUI。先生画面は左右2カラムの入力フォーム、SA画面はサイドバー付きダッシュボード。
+      </div>
+      <div class="card-arrow">&#8594;</div>
+    </a>
+
+    <a class="card" href="<?= baseUrl ?>?page=B" target="_top">
+      <span class="card-label">Design B</span>
+      <div class="card-title">タブレイアウト</div>
+      <div class="card-desc">
+        タブ切替のステップ型UI。先生画面はステッパー+カレンダー選択、SA画面はナビタブでセクション切替。
+      </div>
+      <div class="card-arrow">&#8594;</div>
+    </a>
+
+    <a class="card" href="<?= baseUrl ?>?page=C" target="_top">
+      <span class="card-label">Design C</span>
+      <div class="card-title">ダッシュボードレイアウト</div>
+      <div class="card-desc">
+        3カラム構成の情報密度の高いUI。SA画面はKPIカード+ガントチャート、支援員画面は週間アジェンダ表示。
+      </div>
+      <div class="card-arrow">&#8594;</div>
+    </a>
+  </div>
+
+  <div class="footer">
+    各デザインをタップして詳細を確認してください
+  </div>
+</body>
+</html>

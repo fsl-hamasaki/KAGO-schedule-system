@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Design C: ダッシュボードレイアウト - FSL鹿児島県ICT支援スケジュールシステム</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", "Meiryo", sans-serif;
+    background: #e8ecf1;
+    color: #1a1a1a;
+    line-height: 1.6;
+  }
+
+  /* ===== Section Divider ===== */
+  .section-divider {
+    background: #1b2a4a;
+    color: #fff;
+    text-align: center;
+    padding: 28px 0 20px;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    border-bottom: 4px solid #ff6d00;
+    position: relative;
+  }
+  .section-divider .sub {
+    font-size: 13px;
+    font-weight: 400;
+    color: #a0b4d0;
+    margin-top: 4px;
+    letter-spacing: 0;
+  }
+  .screen-wrapper {
+    max-width: 1200px;
+    margin: 0 auto 40px;
+    aspect-ratio: 4/3;
+    background: #fff;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    overflow: hidden;
+    border-radius: 0 0 6px 6px;
+  }
+
+  /* ===== TEACHER SCREEN ===== */
+  .teacher-header {
+    background: #1b2a4a;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    font-size: 15px;
+  }
+  .teacher-header .logo {
+    font-weight: 700;
+    font-size: 17px;
+    letter-spacing: 1px;
+  }
+  .teacher-header .badge {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.25);
+    border-radius: 6px;
+    padding: 5px 14px;
+    font-size: 13px;
+  }
+  .teacher-body {
+    display: grid;
+    grid-template-columns: 220px 1fr 220px;
+    height: calc(100% - 52px);
+  }
+
+  /* Left column - calendar */
+  .teacher-left {
+    background: #f5f7fa;
+    border-right: 1px solid #dde3eb;
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .month-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .month-nav button {
+    background: none;
+    border: 1px solid #c0c8d4;
+    border-radius: 4px;
+    padding: 2px 10px;
+    cursor: pointer;
+    font-size: 14px;
+    color: #1b2a4a;
+  }
+  .month-nav .current {
+    font-weight: 700;
+    font-size: 15px;
+    color: #1b2a4a;
+  }
+  .mini-cal {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+    margin-bottom: 14px;
+  }
+  .mini-cal th {
+    padding: 3px;
+    text-align: center;
+    font-weight: 600;
+    color: #6b7a90;
+    font-size: 10px;
+  }
+  .mini-cal td {
+    text-align: center;
+    padding: 4px 2px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+  .mini-cal td:hover { background: #e0e7f1; }
+  .mini-cal .sun { color: #d32f2f; }
+  .mini-cal .sat { color: #78909c; }
+  .mini-cal .holiday { background: #ffcdd2; color: #c62828; font-weight: 700; }
+  .mini-cal .weekend { background: #eceff1; color: #90a4ae; }
+  .mini-cal .staff-off { background: #fff3e0; color: #e65100; text-decoration: line-through; }
+  .mini-cal .meeting { background: #e8d5f5; color: #6a1b9a; }
+  .mini-cal .available { background: #e3f2fd; }
+  .mini-cal .today { outline: 2px solid #ff6d00; outline-offset: -1px; }
+
+  .legend {
+    font-size: 11px;
+    color: #5a6a7e;
+  }
+  .legend .item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 5px;
+  }
+  .legend .swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .legend .swatch.hol { background: #ffcdd2; }
+  .legend .swatch.we { background: #eceff1; }
+  .legend .swatch.so { background: #fff3e0; position: relative; }
+  .legend .swatch.so::after { content: ""; position: absolute; top: 50%; left: 0; right: 0; height: 1px; background: #e65100; }
+  .legend .swatch.mt { background: #e8d5f5; }
+
+  /* Center column - form */
+  .teacher-center {
+    padding: 20px 28px;
+    overflow-y: auto;
+    background: #fff;
+    background-image: linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .visit-section {
+    margin-bottom: 24px;
+  }
+  .visit-section-header {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1b2a4a;
+    border-left: 4px solid #ff6d00;
+    padding-left: 10px;
+    margin-bottom: 14px;
+  }
+  .date-selectors {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+  .date-btn {
+    flex: 1;
+    border: 2px dashed #bcc8d8;
+    border-radius: 8px;
+    padding: 14px 10px;
+    text-align: center;
+    cursor: pointer;
+    background: #f9fbfd;
+    transition: all 0.15s;
+  }
+  .date-btn:hover { border-color: #ff6d00; background: #fff8f0; }
+  .date-btn.selected { border: 2px solid #ff6d00; background: #fff3e0; }
+  .date-btn .rank {
+    font-size: 11px;
+    color: #8895a7;
+    font-weight: 600;
+    margin-bottom: 6px;
+  }
+  .date-btn .date-val {
+    font-size: 18px;
+    font-weight: 700;
+    color: #1b2a4a;
+  }
+  .date-btn .date-val.empty {
+    font-size: 13px;
+    color: #b0bec5;
+    font-weight: 400;
+  }
+
+  .comment-area {
+    margin-top: 16px;
+  }
+  .comment-area label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #5a6a7e;
+    margin-bottom: 6px;
+  }
+  .comment-area textarea {
+    width: 100%;
+    border: 1px solid #d0d8e4;
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 13px;
+    resize: vertical;
+    min-height: 60px;
+    font-family: inherit;
+  }
+  .submit-row {
+    margin-top: 18px;
+    text-align: center;
+  }
+  .btn-submit {
+    background: #ff6d00;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 14px 60px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    letter-spacing: 1px;
+    box-shadow: 0 3px 10px rgba(255,109,0,0.3);
+  }
+  .btn-submit:hover { background: #e66000; }
+
+  /* Right column - status */
+  .teacher-right {
+    background: #f5f7fa;
+    border-left: 1px solid #dde3eb;
+    padding: 16px;
+    overflow-y: auto;
+  }
+  .status-block {
+    margin-bottom: 18px;
+  }
+  .status-block h4 {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: #8895a7;
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+    font-weight: 700;
+  }
+  .badge-status {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .badge-status.done { background: #c8e6c9; color: #2e7d32; }
+  .badge-status.pending { background: #fff3e0; color: #e65100; }
+  .confirmed-list {
+    font-size: 13px;
+    color: #37474f;
+  }
+  .confirmed-list .visit-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid #e8ecf1;
+  }
+  .notice-box {
+    background: #fff8e1;
+    border: 1px solid #ffe082;
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 12px;
+    color: #f57f17;
+    font-weight: 600;
+  }
+
+  /* ===== SA SCREEN ===== */
+  .sa-layout {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    height: 100%;
+  }
+  .sa-sidebar {
+    background: #1b2a4a;
+    color: #c8d6e8;
+    padding: 0;
+    overflow-y: auto;
+  }
+  .sa-sidebar .sidebar-logo {
+    padding: 16px 14px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+    letter-spacing: 0.5px;
+  }
+  .sa-sidebar nav a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 11px 16px;
+    color: #a0b4d0;
+    text-decoration: none;
+    font-size: 13px;
+    border-left: 3px solid transparent;
+    transition: all 0.12s;
+  }
+  .sa-sidebar nav a:hover { background: rgba(255,255,255,0.06); color: #fff; }
+  .sa-sidebar nav a.active {
+    background: rgba(255,109,0,0.12);
+    color: #ff6d00;
+    border-left-color: #ff6d00;
+    font-weight: 600;
+  }
+  .sa-sidebar nav a .icon {
+    width: 18px;
+    text-align: center;
+    font-size: 14px;
+  }
+
+  .sa-main {
+    background: #eef1f6;
+    padding: 20px;
+    overflow-y: auto;
+    background-image: linear-gradient(rgba(0,0,0,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.015) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 20px;
+  }
+  .kpi-card {
+    background: #fff;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+  }
+  .kpi-card:nth-child(1)::before { background: #43a047; }
+  .kpi-card:nth-child(2)::before { background: #1e88e5; }
+  .kpi-card:nth-child(3)::before { background: #ff6d00; }
+  .kpi-card:nth-child(4)::before { background: #e53935; }
+  .kpi-card .kpi-label {
+    font-size: 11px;
+    color: #8895a7;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .kpi-card .kpi-value {
+    font-size: 28px;
+    font-weight: 800;
+    color: #1b2a4a;
+  }
+  .kpi-card .kpi-unit {
+    font-size: 13px;
+    font-weight: 400;
+    color: #6b7a90;
+    margin-left: 2px;
+  }
+  .kpi-card .kpi-change {
+    font-size: 11px;
+    margin-top: 4px;
+  }
+  .kpi-card .kpi-change.up { color: #43a047; }
+  .kpi-card .kpi-change.down { color: #e53935; }
+
+  .panel {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    border-bottom: 1px solid #e8ecf1;
+    font-size: 14px;
+    font-weight: 700;
+    color: #1b2a4a;
+  }
+  .panel-header .tab-pills {
+    display: flex;
+    gap: 4px;
+  }
+  .panel-header .tab-pills button {
+    border: none;
+    background: #eef1f6;
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    color: #5a6a7e;
+  }
+  .panel-header .tab-pills button.active {
+    background: #1b2a4a;
+    color: #fff;
+  }
+
+  /* Gantt */
+  .gantt-area {
+    padding: 0;
+    overflow-x: auto;
+  }
+  .gantt-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+  .gantt-table th {
+    padding: 6px 4px;
+    background: #f5f7fa;
+    color: #6b7a90;
+    font-weight: 600;
+    font-size: 10px;
+    text-align: center;
+    border-bottom: 1px solid #dde3eb;
+    position: sticky;
+    top: 0;
+  }
+  .gantt-table th.name-col {
+    text-align: left;
+    padding-left: 14px;
+    width: 120px;
+    min-width: 120px;
+  }
+  .gantt-table td {
+    padding: 0;
+    border-bottom: 1px solid #f0f2f5;
+    height: 32px;
+    position: relative;
+  }
+  .gantt-table td.name-cell {
+    padding: 6px 14px;
+    font-weight: 600;
+    color: #1b2a4a;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .gantt-block {
+    position: absolute;
+    height: 20px;
+    top: 6px;
+    border-radius: 3px;
+    font-size: 9px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .gantt-block.blue { background: #1e88e5; }
+  .gantt-block.green { background: #43a047; }
+  .gantt-block.orange { background: #ff6d00; }
+  .gantt-block.purple { background: #7b1fa2; }
+
+  /* Alert table */
+  .alert-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  .alert-table th {
+    text-align: left;
+    padding: 8px 14px;
+    background: #f5f7fa;
+    color: #6b7a90;
+    font-weight: 600;
+    font-size: 11px;
+    border-bottom: 1px solid #dde3eb;
+  }
+  .alert-table td {
+    padding: 8px 14px;
+    border-bottom: 1px solid #f0f2f5;
+    color: #37474f;
+  }
+  .alert-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+  .alert-badge.urgent { background: #ffcdd2; color: #c62828; }
+  .alert-badge.warning { background: #fff3e0; color: #e65100; }
+  .alert-badge.info { background: #e3f2fd; color: #1565c0; }
+
+  /* ===== SUPPORT STAFF SCREEN ===== */
+  .staff-header {
+    background: #1b2a4a;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+  }
+  .staff-header .staff-profile {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .staff-header .avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #3d5a80;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .staff-header .staff-name {
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .staff-header .staff-role {
+    font-size: 11px;
+    color: #a0b4d0;
+  }
+  .staff-toolbar {
+    background: #fff;
+    border-bottom: 1px solid #dde3eb;
+    padding: 10px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .staff-toolbar .view-tabs {
+    display: flex;
+    gap: 2px;
+    background: #eef1f6;
+    border-radius: 6px;
+    padding: 2px;
+  }
+  .staff-toolbar .view-tabs button {
+    border: none;
+    background: transparent;
+    padding: 6px 16px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #5a6a7e;
+    font-weight: 600;
+  }
+  .staff-toolbar .view-tabs button.active {
+    background: #fff;
+    color: #1b2a4a;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  }
+  .toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: #5a6a7e;
+  }
+  .toggle-switch {
+    width: 40px;
+    height: 22px;
+    background: #c8d6e8;
+    border-radius: 11px;
+    position: relative;
+    cursor: pointer;
+  }
+  .toggle-switch.on { background: #ff6d00; }
+  .toggle-switch::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.15s;
+  }
+  .toggle-switch.on::after { transform: translateX(18px); }
+
+  .weekly-agenda {
+    padding: 16px 24px;
+    background: #fff;
+    background-image: linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px);
+    background-size: 100% 40px;
+  }
+  .week-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .week-header h3 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1b2a4a;
+  }
+  .week-nav {
+    display: flex;
+    gap: 6px;
+  }
+  .week-nav button {
+    border: 1px solid #c0c8d4;
+    background: #fff;
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    color: #1b2a4a;
+  }
+
+  .day-row {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    border-bottom: 1px solid #e8ecf1;
+    min-height: 56px;
+  }
+  .day-label {
+    padding: 12px 10px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #1b2a4a;
+    background: #f9fbfd;
+    border-right: 1px solid #e8ecf1;
+  }
+  .day-label .date-num {
+    font-size: 18px;
+    display: block;
+    line-height: 1;
+  }
+  .day-label .day-name {
+    font-size: 10px;
+    color: #8895a7;
+  }
+  .day-content {
+    padding: 8px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .visit-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+  }
+  .visit-card.v1 { background: #e3f2fd; border-left: 3px solid #1e88e5; }
+  .visit-card.v2 { background: #e8f5e9; border-left: 3px solid #43a047; }
+  .visit-card .school-name { font-weight: 700; color: #1b2a4a; }
+  .visit-card .school-addr { color: #6b7a90; font-size: 11px; }
+  .visit-card .visit-status {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+  .visit-card .visit-status.confirmed { background: #c8e6c9; color: #2e7d32; }
+  .visit-card .visit-status.tentative { background: #fff3e0; color: #e65100; }
+
+  .day-row.weekend .day-label { color: #90a4ae; }
+  .day-row.weekend .day-content { background: #f5f7fa; }
+
+  /* Footer */
+  .mockup-footer {
+    text-align: center;
+    padding: 18px;
+    font-size: 12px;
+    color: #8895a7;
+    background: #1b2a4a;
+    border-top: 3px solid #ff6d00;
+  }
+</style>
+</head>
+<body>
+
+<!-- ============================================================ -->
+<!-- SCREEN 1: TEACHER SCREEN                                      -->
+<!-- ============================================================ -->
+<div class="section-divider">
+  画面1: 先生向け画面（Teacher Screen）
+  <div class="sub">日程候補入力 - ページ遷移なし・1画面で完結</div>
+</div>
+<div class="screen-wrapper">
+  <div class="teacher-header">
+    <span class="logo">&#9632; FSL鹿児島県ICT支援スケジュール</span>
+    <span class="badge">&#127979; 博多小学校 ｜ 山田先生</span>
+  </div>
+  <div class="teacher-body">
+    <!-- Left: Calendar -->
+    <div class="teacher-left">
+      <div class="month-nav">
+        <button>&lt;</button>
+        <span class="current">2026年5月</span>
+        <button>&gt;</button>
+      </div>
+      <table class="mini-cal">
+        <thead>
+          <tr><th class="sun">日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th class="sat">土</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="sun weekend"></td><td class="available"></td><td class="available"></td><td class="meeting">&#9679;</td><td class="available"></td><td class="today available">1</td><td class="sat weekend">2</td>
+          </tr>
+          <tr>
+            <td class="sun weekend">3</td><td class="holiday">4</td><td class="holiday">5</td><td class="holiday">6</td><td class="available">7</td><td class="available">8</td><td class="sat weekend">9</td>
+          </tr>
+          <tr>
+            <td class="sun weekend">10</td><td class="available">11</td><td class="staff-off">12</td><td class="available">13</td><td class="available">14</td><td class="available">15</td><td class="sat weekend">16</td>
+          </tr>
+          <tr>
+            <td class="sun weekend">17</td><td class="available">18</td><td class="available">19</td><td class="meeting">20</td><td class="available">21</td><td class="available">22</td><td class="sat weekend">23</td>
+          </tr>
+          <tr>
+            <td class="sun weekend">24</td><td class="available">25</td><td class="available">26</td><td class="available">27</td><td class="available">28</td><td class="available">29</td><td class="sat weekend">30</td>
+          </tr>
+          <tr>
+            <td class="sun weekend">31</td><td></td><td></td><td></td><td></td><td></td><td></td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="legend">
+        <div class="item"><span class="swatch hol"></span>祝日</div>
+        <div class="item"><span class="swatch we"></span>土日</div>
+        <div class="item"><span class="swatch so"></span>支援員休日</div>
+        <div class="item"><span class="swatch mt"></span>定例会</div>
+      </div>
+    </div>
+
+    <!-- Center: Form -->
+    <div class="teacher-center">
+      <div class="visit-section">
+        <div class="visit-section-header">1回目訪問候補（5/1〜5/20）</div>
+        <div class="date-selectors">
+          <div class="date-btn selected">
+            <div class="rank">第1候補</div>
+            <div class="date-val">5/8（金）</div>
+          </div>
+          <div class="date-btn selected">
+            <div class="rank">第2候補</div>
+            <div class="date-val">5/11（月）</div>
+          </div>
+          <div class="date-btn">
+            <div class="rank">第3候補</div>
+            <div class="date-val empty">日付を選択</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="visit-section">
+        <div class="visit-section-header">2回目訪問候補（5/10〜5/30）</div>
+        <div class="date-selectors">
+          <div class="date-btn selected">
+            <div class="rank">第1候補</div>
+            <div class="date-val">5/21（木）</div>
+          </div>
+          <div class="date-btn">
+            <div class="rank">第2候補</div>
+            <div class="date-val empty">日付を選択</div>
+          </div>
+          <div class="date-btn">
+            <div class="rank">第3候補</div>
+            <div class="date-val empty">日付を選択</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="comment-area">
+        <label>ご要望（支援員の休日でも訪問を希望する場合など）</label>
+        <textarea placeholder="例：5/12は支援員休日ですが、どうしても対応をお願いしたいです。"></textarea>
+      </div>
+
+      <div class="submit-row">
+        <button class="btn-submit">&#x2714; 候補日を送信する</button>
+      </div>
+    </div>
+
+    <!-- Right: Status -->
+    <div class="teacher-right">
+      <div class="status-block">
+        <h4>入力状況</h4>
+        <span class="badge-status pending">入力中</span>
+      </div>
+      <div class="status-block">
+        <h4>確定スケジュール</h4>
+        <div class="confirmed-list">
+          <div class="visit-row">
+            <span>1回目訪問</span>
+            <span style="color:#b0bec5;">未確定</span>
+          </div>
+          <div class="visit-row">
+            <span>2回目訪問</span>
+            <span style="color:#b0bec5;">未確定</span>
+          </div>
+        </div>
+      </div>
+      <div class="status-block">
+        <h4>お知らせ</h4>
+        <div class="notice-box">
+          &#9888; 締切まであと5日<br>
+          <span style="font-size:11px;font-weight:400;color:#f9a825;">（2026/4/29 23:59まで）</span>
+        </div>
+      </div>
+      <div class="status-block" style="margin-top:20px;">
+        <h4>前回の訪問</h4>
+        <div style="font-size:12px;color:#37474f;">
+          2026/4/15（水）<br>
+          <span style="color:#6b7a90;">担当：佐藤支援員</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SCREEN 2: SA MANAGEMENT SCREEN                                -->
+<!-- ============================================================ -->
+<div class="section-divider">
+  画面2: SA管理画面（SA Screen）
+  <div class="sub">ダッシュボード - 入力状況・割り当て・アラート一括管理</div>
+</div>
+<div class="screen-wrapper">
+  <div class="sa-layout">
+    <!-- Sidebar -->
+    <div class="sa-sidebar">
+      <div class="sidebar-logo">&#9632; ICT支援<br>スケジュール管理</div>
+      <nav>
+        <a href="#" class="active"><span class="icon">&#9632;</span>ホーム</a>
+        <a href="#"><span class="icon">&#9998;</span>入力状況</a>
+        <a href="#"><span class="icon">&#9881;</span>自動割り当て</a>
+        <a href="#"><span class="icon">&#9997;</span>手動調整</a>
+        <a href="#"><span class="icon">&#9776;</span>マスタ管理</a>
+        <a href="#"><span class="icon">&#9788;</span>休日設定</a>
+        <a href="#"><span class="icon">&#9993;</span>通知</a>
+        <a href="#"><span class="icon">&#9881;</span>システム設定</a>
+      </nav>
+    </div>
+
+    <!-- Main content -->
+    <div class="sa-main">
+      <!-- KPI Cards -->
+      <div class="kpi-row">
+        <div class="kpi-card">
+          <div class="kpi-label">入力完了率</div>
+          <div class="kpi-value">78<span class="kpi-unit">%</span></div>
+          <div class="kpi-change up">+12% 前日比</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">割り当て済み</div>
+          <div class="kpi-value">124<span class="kpi-unit">校</span></div>
+          <div class="kpi-change up">+8校 本日</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">要調整</div>
+          <div class="kpi-value">17<span class="kpi-unit">件</span></div>
+          <div class="kpi-change down">候補重複あり</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">未対応校</div>
+          <div class="kpi-value">23<span class="kpi-unit">校</span></div>
+          <div class="kpi-change down">締切5日前</div>
+        </div>
+      </div>
+
+      <!-- Gantt Chart -->
+      <div class="panel">
+        <div class="panel-header">
+          月間スケジュール（ガントチャート）
+          <div class="tab-pills">
+            <button class="active">5月</button>
+            <button>6月</button>
+            <button>7月</button>
+          </div>
+        </div>
+        <div class="gantt-area">
+          <table class="gantt-table">
+            <thead>
+              <tr>
+                <th class="name-col">支援員</th>
+                <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th><th>7</th><th>8</th><th>9</th><th>10</th>
+                <th>11</th><th>12</th><th>13</th><th>14</th><th>15</th><th>16</th><th>17</th><th>18</th><th>19</th><th>20</th>
+                <th>21</th><th>22</th><th>23</th><th>24</th><th>25</th><th>26</th><th>27</th><th>28</th><th>29</th><th>30</th><th>31</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="name-cell">佐藤</td>
+                <td colspan="31" style="position:relative;">
+                  <div class="gantt-block blue" style="left:6%;width:3%;">博多</div>
+                  <div class="gantt-block green" style="left:22%;width:3%;">中央</div>
+                  <div class="gantt-block blue" style="left:35%;width:3%;">東</div>
+                  <div class="gantt-block green" style="left:64%;width:3%;">博多</div>
+                  <div class="gantt-block blue" style="left:83%;width:3%;">南</div>
+                </td>
+              </tr>
+              <tr>
+                <td class="name-cell">田中</td>
+                <td colspan="31" style="position:relative;">
+                  <div class="gantt-block blue" style="left:9%;width:3%;">西</div>
+                  <div class="gantt-block green" style="left:19%;width:3%;">城南</div>
+                  <div class="gantt-block orange" style="left:38%;width:3%;">早良</div>
+                  <div class="gantt-block blue" style="left:54%;width:3%;">西</div>
+                  <div class="gantt-block green" style="left:74%;width:3%;">城南</div>
+                </td>
+              </tr>
+              <tr>
+                <td class="name-cell">鈴木</td>
+                <td colspan="31" style="position:relative;">
+                  <div class="gantt-block blue" style="left:3%;width:3%;">東</div>
+                  <div class="gantt-block green" style="left:25%;width:3%;">南</div>
+                  <div class="gantt-block blue" style="left:45%;width:3%;">中央</div>
+                  <div class="gantt-block orange" style="left:67%;width:3%;">東</div>
+                  <div class="gantt-block green" style="left:87%;width:3%;">南</div>
+                </td>
+              </tr>
+              <tr>
+                <td class="name-cell">高橋</td>
+                <td colspan="31" style="position:relative;">
+                  <div class="gantt-block blue" style="left:12%;width:3%;">博多</div>
+                  <div class="gantt-block green" style="left:28%;width:3%;">早良</div>
+                  <div class="gantt-block blue" style="left:48%;width:3%;">西</div>
+                  <div class="gantt-block green" style="left:70%;width:3%;">博多</div>
+                </td>
+              </tr>
+              <tr>
+                <td class="name-cell">伊藤</td>
+                <td colspan="31" style="position:relative;">
+                  <div class="gantt-block blue" style="left:6%;width:3%;">南</div>
+                  <div class="gantt-block orange" style="left:16%;width:3%;">城南</div>
+                  <div class="gantt-block blue" style="left:41%;width:3%;">中央</div>
+                  <div class="gantt-block green" style="left:58%;width:3%;">南</div>
+                  <div class="gantt-block blue" style="left:80%;width:3%;">城南</div>
+                </td>
+              </tr>
+              <tr>
+                <td class="name-cell">渡辺</td>
+                <td colspan="31" style="position:relative;">
+                  <div class="gantt-block green" style="left:9%;width:3%;">早良</div>
+                  <div class="gantt-block blue" style="left:32%;width:3%;">西</div>
+                  <div class="gantt-block green" style="left:51%;width:3%;">東</div>
+                  <div class="gantt-block blue" style="left:74%;width:3%;">早良</div>
+                </td>
+              </tr>
+              <tr>
+                <td class="name-cell">中村</td>
+                <td colspan="31" style="position:relative;">
+                  <div class="gantt-block blue" style="left:3%;width:3%;">中央</div>
+                  <div class="gantt-block orange" style="left:22%;width:3%;">博多</div>
+                  <div class="gantt-block green" style="left:45%;width:3%;">南</div>
+                  <div class="gantt-block blue" style="left:64%;width:3%;">中央</div>
+                  <div class="gantt-block green" style="left:90%;width:3%;">博多</div>
+                </td>
+              </tr>
+              <tr>
+                <td class="name-cell">小林</td>
+                <td colspan="31" style="position:relative;">
+                  <div class="gantt-block blue" style="left:6%;width:3%;">城南</div>
+                  <div class="gantt-block green" style="left:19%;width:3%;">東</div>
+                  <div class="gantt-block blue" style="left:38%;width:3%;">西</div>
+                  <div class="gantt-block orange" style="left:58%;width:3%;">城南</div>
+                  <div class="gantt-block green" style="left:80%;width:3%;">東</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Alert Table -->
+      <div class="panel">
+        <div class="panel-header">
+          アラート・対応事項
+          <div class="tab-pills">
+            <button class="active">未対応</button>
+            <button>対応済み</button>
+          </div>
+        </div>
+        <table class="alert-table">
+          <thead>
+            <tr>
+              <th style="width:80px;">優先度</th>
+              <th>内容</th>
+              <th style="width:120px;">対象校</th>
+              <th style="width:100px;">期限</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="alert-badge urgent">緊急</span></td>
+              <td>候補日が全て支援員休日と重複</td>
+              <td>春吉小学校</td>
+              <td>4/27</td>
+            </tr>
+            <tr>
+              <td><span class="alert-badge urgent">緊急</span></td>
+              <td>入力期限超過（リマインド送信済み）</td>
+              <td>住吉小学校</td>
+              <td>4/25</td>
+            </tr>
+            <tr>
+              <td><span class="alert-badge warning">注意</span></td>
+              <td>佐藤支援員の5/8が3校重複</td>
+              <td>複数校</td>
+              <td>4/29</td>
+            </tr>
+            <tr>
+              <td><span class="alert-badge warning">注意</span></td>
+              <td>2回目候補が1つしか入力されていない</td>
+              <td>東住吉小学校</td>
+              <td>4/29</td>
+            </tr>
+            <tr>
+              <td><span class="alert-badge info">情報</span></td>
+              <td>5月定例会日程が未設定</td>
+              <td>全校</td>
+              <td>4/30</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- SCREEN 3: SUPPORT STAFF SCREEN                                -->
+<!-- ============================================================ -->
+<div class="section-divider">
+  画面3: 支援員向け画面（Support Staff Screen）
+  <div class="sub">週間アジェンダビュー - 訪問スケジュール確認</div>
+</div>
+<div class="screen-wrapper">
+  <div class="staff-header">
+    <div class="staff-profile">
+      <div class="avatar">佐</div>
+      <div>
+        <div class="staff-name">佐藤 太郎</div>
+        <div class="staff-role">ICT支援員 ｜ 博多区・中央区担当</div>
+      </div>
+    </div>
+    <span class="badge" style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);border-radius:6px;padding:5px 14px;font-size:13px;color:#fff;">2026年5月 第3週</span>
+  </div>
+  <div class="staff-toolbar">
+    <div class="view-tabs">
+      <button class="active">週間</button>
+      <button>月間カレンダー</button>
+    </div>
+    <div class="toggle-label">
+      担当校のみ表示
+      <div class="toggle-switch on"></div>
+    </div>
+  </div>
+  <div class="weekly-agenda">
+    <div class="week-header">
+      <h3>5月18日（月）〜 5月22日（金）</h3>
+      <div class="week-nav">
+        <button>&lt; 前週</button>
+        <button>今週</button>
+        <button>翌週 &gt;</button>
+      </div>
+    </div>
+
+    <div class="day-row">
+      <div class="day-label">
+        <span class="date-num">18</span>
+        <span class="day-name">月曜日</span>
+      </div>
+      <div class="day-content">
+        <div class="visit-card v1">
+          <div>
+            <div class="school-name">博多小学校</div>
+            <div class="school-addr">博多区博多駅前2-1-1</div>
+          </div>
+          <span class="visit-status confirmed">確定</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="day-row">
+      <div class="day-label">
+        <span class="date-num">19</span>
+        <span class="day-name">火曜日</span>
+      </div>
+      <div class="day-content">
+        <div class="visit-card v2">
+          <div>
+            <div class="school-name">千代小学校</div>
+            <div class="school-addr">博多区千代1-23-1</div>
+          </div>
+          <span class="visit-status confirmed">確定</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="day-row">
+      <div class="day-label">
+        <span class="date-num">20</span>
+        <span class="day-name">水曜日</span>
+      </div>
+      <div class="day-content">
+        <div class="visit-card v1">
+          <div>
+            <div class="school-name">住吉小学校</div>
+            <div class="school-addr">博多区住吉4-5-6</div>
+          </div>
+          <span class="visit-status tentative">仮確定</span>
+        </div>
+        <div class="visit-card v2">
+          <div>
+            <div class="school-name">春吉小学校</div>
+            <div class="school-addr">中央区春吉3-2-1</div>
+          </div>
+          <span class="visit-status tentative">仮確定</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="day-row">
+      <div class="day-label">
+        <span class="date-num">21</span>
+        <span class="day-name">木曜日</span>
+      </div>
+      <div class="day-content">
+        <div class="visit-card v1">
+          <div>
+            <div class="school-name">舞鶴小学校</div>
+            <div class="school-addr">中央区舞鶴2-6-1</div>
+          </div>
+          <span class="visit-status confirmed">確定</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="day-row">
+      <div class="day-label">
+        <span class="date-num">22</span>
+        <span class="day-name">金曜日</span>
+      </div>
+      <div class="day-content">
+        <div style="color:#8895a7;font-size:13px;padding:8px 0;">訪問予定なし</div>
+      </div>
+    </div>
+
+    <!-- Monthly calendar mini-preview -->
+    <div style="margin-top:24px;padding-top:18px;border-top:2px solid #e8ecf1;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <span style="font-size:13px;font-weight:700;color:#1b2a4a;">5月 月間カレンダー（プレビュー）</span>
+        <span style="font-size:11px;color:#6b7a90;">&#9679; 1回目 &nbsp; &#9679; 2回目</span>
+      </div>
+      <table class="mini-cal" style="max-width:480px;">
+        <thead>
+          <tr><th class="sun">日</th><th>月</th><th>火</th><th>水</th><th>木</th><th>金</th><th class="sat">土</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="sun weekend"></td><td></td><td></td><td></td><td></td><td style="background:#e3f2fd;font-weight:700;color:#1565c0;">1</td><td class="sat weekend">2</td>
+          </tr>
+          <tr>
+            <td class="sun weekend">3</td><td class="holiday">4</td><td class="holiday">5</td><td class="holiday">6</td><td></td><td style="background:#e3f2fd;font-weight:700;color:#1565c0;">8</td><td class="sat weekend">9</td>
+          </tr>
+          <tr>
+            <td class="sun weekend">10</td><td></td><td></td><td style="background:#e8f5e9;font-weight:700;color:#2e7d32;">13</td><td></td><td></td><td class="sat weekend">16</td>
+          </tr>
+          <tr>
+            <td class="sun weekend">17</td><td style="background:#e3f2fd;font-weight:700;color:#1565c0;">18</td><td style="background:#e8f5e9;font-weight:700;color:#2e7d32;">19</td><td style="background:#e3f2fd;font-weight:700;color:#1565c0;">20</td><td style="background:#e3f2fd;font-weight:700;color:#1565c0;">21</td><td></td><td class="sat weekend">23</td>
+          </tr>
+          <tr>
+            <td class="sun weekend">24</td><td></td><td style="background:#e8f5e9;font-weight:700;color:#2e7d32;">26</td><td></td><td style="background:#e3f2fd;font-weight:700;color:#1565c0;">28</td><td></td><td class="sat weekend">30</td>
+          </tr>
+          <tr>
+            <td class="sun weekend">31</td><td></td><td></td><td></td><td></td><td></td><td></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div class="mockup-footer">
+  Design C: ダッシュボードレイアウト
+</div>
+
+</body>
+</html>
