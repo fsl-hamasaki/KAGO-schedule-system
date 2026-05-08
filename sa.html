@@ -1634,9 +1634,16 @@
     }
     if (unassigned.length > 0) {
       uCard.style.display = 'block';
-      var uHtml = '<table class="data-table"><thead><tr><th>学校名</th><th>担当支援員</th><th>状況</th><th></th></tr></thead><tbody>';
+      var uHtml = '<table class="data-table"><thead><tr><th>学校名</th><th>支援種別</th><th>担当支援員</th><th>状況</th><th></th></tr></thead><tbody>';
       for (var i = 0; i < unassigned.length; i++) {
+        var typeBadge;
+        if (unassigned[i].supportType === 'オンライン') {
+          typeBadge = '<span style="background:#cffafe;color:#155e75;padding:1px 8px;border-radius:4px;font-size:0.78rem;">💻 オンライン</span>';
+        } else {
+          typeBadge = '<span style="background:#e8f0fe;color:#1a73e8;padding:1px 8px;border-radius:4px;font-size:0.78rem;">訪問</span>';
+        }
         uHtml += '<tr><td style="font-weight:600;">' + esc(unassigned[i].schoolName) + '</td>' +
+          '<td>' + typeBadge + '</td>' +
           '<td>' + esc(unassigned[i].staffName) + '</td>' +
           '<td>' + esc(unassigned[i].reason) + '</td>' +
           '<td><a style="color:#1a73e8;cursor:pointer;font-size:0.78rem;" onclick="onUnassignedClick(\'' +
@@ -1820,6 +1827,7 @@
   function getUnassignedSchools() {
     // 候補日を出した学校のうち、本人が希望した支援が割り当てられていない学校
     // （現在の対象月＝settings.targetMonthのみ。candidates 自体が対象月で絞られている）
+    var ONLINE_SA = '山崎 混平';
     var assignedMap = {};
     for (var i = 0; i < scheduleData.length; i++) {
       var s = scheduleData[i];
@@ -1832,12 +1840,27 @@
     for (var i = 0; i < candidates.length; i++) {
       var c = candidates[i];
       var a = assignedMap[c.schoolName] || { v1: false, v2: false };
+      var schoolStaff = getStaffForSchool(c.schoolName);
 
       if (!a.v1) {
-        result.push({ schoolName: c.schoolName, staffName: getStaffForSchool(c.schoolName), reason: '1回目未割当' });
+        var v1Type = c.supportType || '訪問';
+        var v1Handler = v1Type === 'オンライン' ? ONLINE_SA : schoolStaff;
+        result.push({
+          schoolName: c.schoolName,
+          staffName: v1Handler,
+          supportType: v1Type,
+          reason: '1回目未割当'
+        });
       } else if (c.wantSecond && !a.v2) {
         // 2回目を希望した学校だけ未割当として表示
-        result.push({ schoolName: c.schoolName, staffName: getStaffForSchool(c.schoolName), reason: '2回目未割当' });
+        var v2Type = c.supportType2 || '訪問';
+        var v2Handler = v2Type === 'オンライン' ? ONLINE_SA : schoolStaff;
+        result.push({
+          schoolName: c.schoolName,
+          staffName: v2Handler,
+          supportType: v2Type,
+          reason: '2回目未割当'
+        });
       }
     }
     return result;
