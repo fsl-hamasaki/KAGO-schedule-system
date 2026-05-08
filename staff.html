@@ -417,16 +417,23 @@
           var schoolShort = entry.schoolName.replace('中学校', '');
           var isDelegated = (entry.origStaff === myStaffName && entry.staffName !== myStaffName);
           var isSubstitute = (entry.origStaff && entry.origStaff !== myStaffName && entry.staffName === myStaffName);
+          var isOnline = entry.supportType === 'オンライン';
+          var iconHtml = isOnline ? '<span style="margin-right:2px;">💻</span>' : '';
+          var titleAttr = entry.timeSlot ? entry.timeSlot + (isOnline ? ' (オンライン)' : '') : (isOnline ? 'オンライン' : '');
+          var titleHtmlAttr = titleAttr ? ' title="' + esc(titleAttr) + '"' : '';
           var chipStyle = 'display:inline-block; padding:1px 5px; border-radius:3px; font-size:0.62rem; font-weight:600; margin:1px 0;';
           if (isDelegated) {
             chipStyle += 'background:#f8f9fa; color:#5f6368; border:1px dashed #9aa0a6; opacity:0.7;';
-            html += '<div style="' + chipStyle + '" title="代行: ' + esc(entry.staffName) + '">' + esc(schoolShort) + ' →' + esc(entry.staffName.split(/[\s　]/)[0]) + '</div>';
+            html += '<div style="' + chipStyle + '" title="代行: ' + esc(entry.staffName) + '">' + iconHtml + esc(schoolShort) + ' →' + esc(entry.staffName.split(/[\s　]/)[0]) + '</div>';
           } else if (isSubstitute) {
             chipStyle += 'background:#fff3e0; color:#e65100;';
-            html += '<div style="' + chipStyle + '" title="' + esc(entry.origStaff) + 'の代行">' + esc(schoolShort) + ' (代行)</div>';
+            html += '<div style="' + chipStyle + '" title="' + esc(entry.origStaff) + 'の代行">' + iconHtml + esc(schoolShort) + ' (代行)</div>';
+          } else if (isOnline) {
+            chipStyle += 'background:#f3e8fd; color:#6b21a8; border:1px solid #d8b4fe;';
+            html += '<div style="' + chipStyle + '"' + titleHtmlAttr + '>' + iconHtml + esc(schoolShort) + '</div>';
           } else {
             chipStyle += 'background:#e8f0fe; color:#1a73e8;';
-            html += '<div style="' + chipStyle + '">' + esc(schoolShort) + '</div>';
+            html += '<div style="' + chipStyle + '"' + titleHtmlAttr + '>' + esc(schoolShort) + '</div>';
           }
         }
       }
@@ -443,6 +450,7 @@
     html += '<div class="legend-item"><div class="legend-dot" style="background:#f3e8fd;"></div>休日（承認済）</div>';
     html += '<div class="legend-item"><div class="legend-dot" style="background:#fff8e1; outline:1px dashed #f9ab00;"></div>休日（申請中）</div>';
     html += '<div class="legend-item"><div class="legend-dot" style="background:#e8f0fe;border:1px solid #1a73e8;"></div>訪問</div>';
+    html += '<div class="legend-item"><div class="legend-dot" style="background:#f3e8fd;border:1px solid #d8b4fe;"></div>💻オンライン</div>';
     html += '<div class="legend-item"><div class="legend-dot" style="background:#fff3e0;border:1px solid #e65100;"></div>代行</div>';
     html += '</div>';
     document.getElementById('calArea').innerHTML = html;

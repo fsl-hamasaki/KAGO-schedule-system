@@ -406,6 +406,8 @@
   .school-chip.v2 { background: #e6f4ea; color: #137333; }
   .school-chip.v3 { background: #fff3e0; color: #e65100; }
   .school-chip.manual { background: #fce8e6; color: #c5221f; }
+  .school-chip.online { background: #f3e8fd; color: #6b21a8; border: 1px solid #d8b4fe; }
+  .school-chip.online .online-icon { margin-right: 2px; }
   .school-chip:hover { opacity: 0.8; }
   .staff-label { font-weight: 400; font-size: 0.58rem; color: #80868b; text-decoration: underline; }
   .school-chip.delegated {
@@ -1577,6 +1579,7 @@
       calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#e8f0fe;border:1px solid #1a73e8;"></div>1回目</div>';
       calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#e6f4ea;border:1px solid #137333;"></div>2回目</div>';
       calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#fff3e0;border:1px solid #e65100;"></div>3回目</div>';
+      calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#f3e8fd;border:1px solid #d8b4fe;"></div>💻オンライン</div>';
       calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#f8f9fa;border:1.5px dashed #9aa0a6;"></div>代行</div>';
       calendarsHtml += '</div>';
       calendarsHtml += '</div>';
@@ -1588,6 +1591,7 @@
       calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#e8f0fe;border:1px solid #1a73e8;"></div>1回目</div>';
       calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#e6f4ea;border:1px solid #137333;"></div>2回目</div>';
       calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#fff3e0;border:1px solid #e65100;"></div>3回目</div>';
+      calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#f3e8fd;border:1px solid #d8b4fe;"></div>💻オンライン</div>';
       calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#f8f9fa;border:1.5px dashed #9aa0a6;"></div>代行</div>';
       calendarsHtml += '</div>';
       calendarsHtml += '</div>';
@@ -1610,6 +1614,7 @@
         calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#e8f0fe;border:1px solid #1a73e8;"></div>1回目</div>';
         calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#e6f4ea;border:1px solid #137333;"></div>2回目</div>';
         calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#fff3e0;border:1px solid #e65100;"></div>3回目</div>';
+      calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#f3e8fd;border:1px solid #d8b4fe;"></div>💻オンライン</div>';
       calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#f8f9fa;border:1.5px dashed #9aa0a6;"></div>代行</div>';
         calendarsHtml += '</div>';
         calendarsHtml += '</div>';
@@ -1695,23 +1700,28 @@
           if (entry.candidateRank.indexOf('1回目') !== -1) chipCls += ' v1';
           else if (entry.candidateRank.indexOf('2回目') !== -1) chipCls += ' v2';
           else if (entry.candidateRank.indexOf('3回目') !== -1) chipCls += ' v3';
+          var isOnline = entry.supportType === 'オンライン';
+          if (isOnline) chipCls += ' online';
 
           var shortName = shortenSchool(entry.schoolName);
           var chipStaff = entry.staffName; // クリック時に使う支援員名
+          var iconHtml = isOnline ? '<span class="online-icon">💻</span>' : '';
+          var slotTitle = entry.timeSlot ? '\n' + entry.timeSlot : '';
+          var typeTitle = isOnline ? '\nオンライン支援' : '';
 
           if (entry.isDelegated) {
             // 代行チップ（元担当のカレンダーに表示）
             chipCls += ' delegated';
             shortName += ' →' + shortenStaff(entry.staffName);
-            html += '<div class="' + chipCls + '" title="' + esc(entry.schoolName) + '&#10;代行: ' + esc(entry.staffName) + '&#10;' + esc(entry.candidateRank) + '"' +
+            html += '<div class="' + chipCls + '" title="' + esc(entry.schoolName + typeTitle + slotTitle) + '&#10;代行: ' + esc(entry.staffName) + '&#10;' + esc(entry.candidateRank) + '"' +
               ' onclick="onScheduleChipClick(\'' + esc(ds) + '\',\'' + esc(entry.staffName) + '\',\'' + esc(entry.schoolName) + '\')">' +
-              esc(shortName) + '</div>';
+              iconHtml + esc(shortName) + '</div>';
           } else {
             var extraLabel = '';
             if (entry.origStaff) extraLabel = ' (' + shortenStaff(entry.origStaff) + '代行)';
-            html += '<div class="' + chipCls + '" title="' + esc(entry.schoolName) + '&#10;' + esc(entry.candidateRank) + '&#10;' + esc(entry.status) + (entry.origStaff ? '&#10;元担当: ' + esc(entry.origStaff) : '') + '"' +
+            html += '<div class="' + chipCls + '" title="' + esc(entry.schoolName + typeTitle + slotTitle) + '&#10;' + esc(entry.candidateRank) + '&#10;' + esc(entry.status) + (entry.origStaff ? '&#10;元担当: ' + esc(entry.origStaff) : '') + '"' +
               ' onclick="onScheduleChipClick(\'' + esc(ds) + '\',\'' + esc(chipStaff) + '\',\'' + esc(entry.schoolName) + '\')">' +
-              esc(shortName + extraLabel) + '</div>';
+              iconHtml + esc(shortName + extraLabel) + '</div>';
           }
         }
       }
@@ -1777,10 +1787,15 @@
           if (entry.candidateRank.indexOf('1回目') !== -1) chipCls += ' v1';
           else if (entry.candidateRank.indexOf('2回目') !== -1) chipCls += ' v2';
           else if (entry.candidateRank.indexOf('3回目') !== -1) chipCls += ' v3';
+          var isOnline = entry.supportType === 'オンライン';
+          if (isOnline) chipCls += ' online';
+          var iconHtml = isOnline ? '<span class="online-icon">💻</span>' : '';
+          var slotTitle = entry.timeSlot ? '&#10;' + esc(entry.timeSlot) : '';
+          var typeTitle = isOnline ? '&#10;オンライン支援' : '';
 
-          html += '<div class="' + chipCls + '" title="' + esc(entry.schoolName) + '&#10;' + esc(entry.staffName) + '&#10;' + esc(entry.candidateRank) + '"' +
+          html += '<div class="' + chipCls + '" title="' + esc(entry.schoolName) + typeTitle + slotTitle + '&#10;' + esc(entry.staffName) + '&#10;' + esc(entry.candidateRank) + '"' +
             ' onclick="onScheduleChipClick(\'' + esc(ds) + '\',\'' + esc(entry.staffName) + '\',\'' + esc(entry.schoolName) + '\')">' +
-            esc(shortenSchool(entry.schoolName)) + ' <span class="staff-label">' + esc(shortenStaff(entry.staffName)) + '</span></div>';
+            iconHtml + esc(shortenSchool(entry.schoolName)) + ' <span class="staff-label">' + esc(shortenStaff(entry.staffName)) + '</span></div>';
         }
       }
 

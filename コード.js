@@ -2012,16 +2012,18 @@ function getSchedule_(targetMonth) {
   var data = sheet.getDataRange().getValues();
   var results = [];
   for (var i = 1; i < data.length; i++) {
-    var month = String(data[i][0]).trim();
+    var month = normalizeTargetMonth_(data[i][0]);
     if (targetMonth && month !== targetMonth) continue;
     results.push({
       targetMonth: month,
-      date: String(data[i][1]).trim(),
+      date: normalizeCandidateDate_(data[i][1]),
       staffName: String(data[i][2]).trim(),
       schoolName: String(data[i][3]).trim(),
       candidateRank: String(data[i][4]).trim(),
       status: String(data[i][5]).trim(),
-      origStaff: String(data[i][6] || '').trim()
+      origStaff: String(data[i][6] || '').trim(),
+      timeSlot: String(data[i][7] == null ? '' : data[i][7]).trim(),
+      supportType: String(data[i][8] == null ? '' : data[i][8]).trim()
     });
   }
   return results;
@@ -2174,6 +2176,50 @@ function savePriorityScores_(scores) {
 
 // ===== 自動スケジュール割り当て =====
 
+// 支援種別 + 時間帯 から (date, slot) 排他制御用のキーを得る
+function getSlotKey_(supportType, timeSlot) {
+  if (supportType === 'オンライン') return 'ONLINE';
+  if (timeSlot === '09:00-12:00') return 'AM';
+  if (timeSlot === '13:30-16:30') return 'PM';
+  if (timeSlot === '09:00-16:00') return 'FULL';
+  return 'AM';
+}
+
+// (date, slot) が利用可能か（AM+PM 同日OK、FULL は他をブロック、ONLINE は1日1回）
+function canUseSlot_(usedSlots, date, slot) {
+  if (!usedSlots[date]) return true;
+  var u = usedSlots[date];
+  if (slot === 'FULL')   return !(u.AM || u.PM || u.FULL || u.ONLINE);
+  if (slot === 'AM')     return !(u.AM || u.FULL);
+  if (slot === 'PM')     return !(u.PM || u.FULL);
+  if (slot === 'ONLINE') return !(u.FULL || u.ONLINE);
+  return true;
+}
+
+function markSlotUsed_(usedSlots, date, slot) {
+  if (!usedSlots[date]) usedSlots[date] = {};
+  usedSlots[date][slot] = true;
+}
+
+// スケジュールシートに「時間帯」「支援種別」列が無ければ追加
+function ensureScheduleExtraColumns_(sheet) {
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 1) return;
+  var hdrs = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var have = {};
+  for (var i = 0; i < hdrs.length; i++) have[String(hdrs[i]).trim()] = true;
+
+  var toAdd = [];
+  if (!have['時間帯']) toAdd.push('時間帯');
+  if (!have['支援種別']) toAdd.push('支援種別');
+
+  for (var i = 0; i < toAdd.length; i++) {
+    var col = sheet.getLastColumn() + 1;
+    sheet.getRange(1, col).setValue(toAdd[i])
+      .setFontWeight('bold').setBackground('#1a73e8').setFontColor('#ffffff');
+  }
+}
+
 function autoAssignSchedule() {
   var settings = getSystemSettings_();
   var targetMonth = settings.targetMonth;
@@ -2236,206 +2282,183 @@ function autoAssignSchedule() {
     schoolStaffMap[schools[i].schoolName] = schools[i].staffName;
   }
 
-  // --- 4. 候補日を支援員別に整理 ---
-  var staffSchoolCandidates = {}; // { staffName: [ {school, v1candidates, v2candidates, ...} ] }
+  // --- 4. 候補日を Visit 単位のリクエストに分解（オンライン要望は SA 担当に振り分け） ---
+  var ONLINE_SA_STAFF = '山崎 混平'; // オンライン支援を一括担当するSA
+
+  var allRequests = [];
   for (var i = 0; i < candidates.length; i++) {
     var c = candidates[i];
-    var staff = schoolStaffMap[c.schoolName];
-    if (!staff) continue;
-    if (!staffSchoolCandidates[staff]) staffSchoolCandidates[staff] = [];
+    var schoolStaff = schoolStaffMap[c.schoolName];
+    if (!schoolStaff) continue;
 
     var v1 = [c.v1c1, c.v1c2, c.v1c3].filter(function(v) { return v && v !== '特に指定しない' && v !== 'undefined'; });
-    var v2 = [c.v2c1, c.v2c2, c.v2c3].filter(function(v) { return v && v !== '特に指定しない' && v !== 'undefined'; });
-    var v3 = [];
-    if (c.wantThird) {
-      v3 = [c.v3c1, c.v3c2, c.v3c3].filter(function(v) { return v && v !== '特に指定しない' && v !== 'undefined'; });
-    }
+    var v2 = c.wantSecond ? [c.v2c1, c.v2c2, c.v2c3].filter(function(v) { return v && v !== '特に指定しない' && v !== 'undefined'; }) : [];
 
-    staffSchoolCandidates[staff].push({
+    // 1回目
+    var v1Staff = (c.supportType === 'オンライン') ? ONLINE_SA_STAFF : schoolStaff;
+    allRequests.push({
       schoolName: c.schoolName,
-      v1: v1,
-      v2: v2,
-      v3: v3,
-      wantThird: c.wantThird,
-      reducePolicy: c.reducePolicy,
+      visitNum: 1,
+      candidates: v1,
+      supportType: c.supportType || '訪問',
+      timeSlot: c.timeSlot || '',
+      slotKey: getSlotKey_(c.supportType, c.timeSlot),
+      staff: v1Staff,
       priority: priorityScores[c.schoolName] || 0
     });
+
+    // 2回目（希望校のみ）
+    if (c.wantSecond) {
+      var v2Staff = (c.supportType2 === 'オンライン') ? ONLINE_SA_STAFF : schoolStaff;
+      allRequests.push({
+        schoolName: c.schoolName,
+        visitNum: 2,
+        candidates: v2,
+        supportType: c.supportType2 || '訪問',
+        timeSlot: c.timeSlot2 || '',
+        slotKey: getSlotKey_(c.supportType2, c.timeSlot2),
+        staff: v2Staff,
+        priority: priorityScores[c.schoolName] || 0
+      });
+    }
   }
 
-  // --- 5. 割り当てアルゴリズム ---
+  // --- 5. 割り当てアルゴリズム（2パス: 全Visit1 → 全Visit2） ---
   var scheduleRows = [];
   var newPriorityScores = {};
 
-  for (var staffName in staffSchoolCandidates) {
-    var workDays = getStaffWorkDays(staffName);
-    var usedDays = {}; // 日付 → 使用済み
-    var schoolList = staffSchoolCandidates[staffName];
+  function dayDiff(d1, d2) {
+    return Math.abs((new Date(d1) - new Date(d2)) / 86400000);
+  }
 
-    // 優先スコアが高い学校を先に処理
-    schoolList.sort(function(a, b) { return b.priority - a.priority; });
+  // 支援員別の使用済みslot/稼働日マップ
+  var staffUsedSlots = {};
+  var staffWorkDaysMap = {};
 
-    var schoolAssignments = []; // { schoolName, visit1Date, visit1Rank, visit2Date, visit2Rank }
+  function getStaffEnv(staff) {
+    if (!staffUsedSlots[staff]) staffUsedSlots[staff] = {};
+    if (!staffWorkDaysMap[staff]) staffWorkDaysMap[staff] = getStaffWorkDays(staff);
+    return { used: staffUsedSlots[staff], work: staffWorkDaysMap[staff] };
+  }
 
-    // --- Visit 1 割り当て ---
-    for (var si = 0; si < schoolList.length; si++) {
-      var sc = schoolList[si];
-      var assigned = false;
+  // 学校ごとの v1 確定日（v2 の間隔チェック用、担当SA違いに関わらず）
+  var schoolV1DateMap = {};
+  // 学校ごとに割り当て結果を記録
+  var assignmentsBySchool = {};
 
-      // 第1〜第3候補を順に試す
-      for (var ci = 0; ci < sc.v1.length; ci++) {
-        var date = sc.v1[ci];
-        if (workDays.indexOf(date) !== -1 && !usedDays[date]) {
-          usedDays[date] = true;
-          schoolAssignments.push({ schoolName: sc.schoolName, visit1Date: date, visit1Rank: '第' + (ci + 1) + '候補' });
-          assigned = true;
-          break;
-        }
-      }
+  function assignRequest_(req, requireDistanceFrom, minDistance, fallbackDistance) {
+    var env = getStaffEnv(req.staff);
+    var assigned = null;
 
-      // 候補日がすべて埋まっていたら空いている日から割り当て
-      if (!assigned) {
-        for (var wi = 0; wi < workDays.length; wi++) {
-          if (!usedDays[workDays[wi]]) {
-            usedDays[workDays[wi]] = true;
-            schoolAssignments.push({ schoolName: sc.schoolName, visit1Date: workDays[wi], visit1Rank: '自動割当' });
-            assigned = true;
-            // 優先スコア加算（候補外に割り当てられた）
-            newPriorityScores[sc.schoolName] = (newPriorityScores[sc.schoolName] || 0) + 2;
-            break;
-          }
-        }
-      }
-
-      if (!assigned) {
-        schoolAssignments.push({ schoolName: sc.schoolName, visit1Date: '', visit1Rank: '割当不可' });
+    // 第1〜第3候補を順に試す
+    for (var ci = 0; ci < req.candidates.length; ci++) {
+      var date = req.candidates[ci];
+      if (env.work.indexOf(date) !== -1 && canUseSlot_(env.used, date, req.slotKey) &&
+          (!requireDistanceFrom || dayDiff(requireDistanceFrom, date) >= minDistance)) {
+        markSlotUsed_(env.used, date, req.slotKey);
+        assigned = { date: date, rank: '第' + (ci + 1) + '候補' };
+        break;
       }
     }
 
-    // --- Visit 2 割り当て（Visit 1から5日以上空ける） ---
-    for (var si = 0; si < schoolAssignments.length; si++) {
-      var sa = schoolAssignments[si];
-      var sc = schoolList[si];
-      var v1Date = sa.visit1Date;
-      var assigned = false;
-
-      function dayDiff(d1, d2) {
-        return Math.abs((new Date(d1) - new Date(d2)) / 86400000);
-      }
-
-      // 第1〜第3候補を順に試す（5日以上間隔）
-      for (var ci = 0; ci < sc.v2.length; ci++) {
-        var date = sc.v2[ci];
-        if (workDays.indexOf(date) !== -1 && !usedDays[date] && (!v1Date || dayDiff(v1Date, date) >= 5)) {
-          usedDays[date] = true;
-          sa.visit2Date = date;
-          sa.visit2Rank = '第' + (ci + 1) + '候補';
-          assigned = true;
+    // 候補外でも空きを探す（規定間隔）
+    if (!assigned) {
+      for (var wi = 0; wi < env.work.length; wi++) {
+        var wd = env.work[wi];
+        if (canUseSlot_(env.used, wd, req.slotKey) &&
+            (!requireDistanceFrom || dayDiff(requireDistanceFrom, wd) >= minDistance)) {
+          markSlotUsed_(env.used, wd, req.slotKey);
+          assigned = { date: wd, rank: '自動割当' };
+          newPriorityScores[req.schoolName] = (newPriorityScores[req.schoolName] || 0) + 2;
           break;
-        }
-      }
-
-      if (!assigned) {
-        // 空いている日で5日以上離れた日を探す
-        for (var wi = 0; wi < workDays.length; wi++) {
-          var wd = workDays[wi];
-          if (!usedDays[wd] && (!v1Date || dayDiff(v1Date, wd) >= 5)) {
-            usedDays[wd] = true;
-            sa.visit2Date = wd;
-            sa.visit2Rank = '自動割当';
-            newPriorityScores[sc.schoolName] = (newPriorityScores[sc.schoolName] || 0) + 1;
-            assigned = true;
-            break;
-          }
-        }
-      }
-
-      // 5日間隔が無理なら3日以上で妥協
-      if (!assigned) {
-        for (var wi = 0; wi < workDays.length; wi++) {
-          var wd = workDays[wi];
-          if (!usedDays[wd] && (!v1Date || dayDiff(v1Date, wd) >= 3)) {
-            usedDays[wd] = true;
-            sa.visit2Date = wd;
-            sa.visit2Rank = '自動割当(間隔短)';
-            assigned = true;
-            break;
-          }
-        }
-      }
-
-      if (!assigned) {
-        sa.visit2Date = '';
-        sa.visit2Rank = '割当不可';
-      }
-    }
-
-    // --- Visit 3（希望校のみ、余りの日がある場合） ---
-    for (var si = 0; si < schoolAssignments.length; si++) {
-      var sa = schoolAssignments[si];
-      var sc = schoolList[si];
-      if (!sc.wantThird) continue;
-
-      var v1 = sa.visit1Date;
-      var v2 = sa.visit2Date;
-      var assigned = false;
-
-      for (var ci = 0; ci < sc.v3.length; ci++) {
-        var date = sc.v3[ci];
-        if (workDays.indexOf(date) !== -1 && !usedDays[date] &&
-            (!v1 || dayDiff(v1, date) >= 3) && (!v2 || dayDiff(v2, date) >= 3)) {
-          usedDays[date] = true;
-          sa.visit3Date = date;
-          sa.visit3Rank = '第' + (ci + 1) + '候補';
-          assigned = true;
-          break;
-        }
-      }
-
-      if (!assigned) {
-        for (var wi = 0; wi < workDays.length; wi++) {
-          var wd = workDays[wi];
-          if (!usedDays[wd] && (!v1 || dayDiff(v1, wd) >= 3) && (!v2 || dayDiff(v2, wd) >= 3)) {
-            usedDays[wd] = true;
-            sa.visit3Date = wd;
-            sa.visit3Rank = '自動割当';
-            assigned = true;
-            break;
-          }
         }
       }
     }
 
-    // --- 結果をまとめる ---
-    for (var si = 0; si < schoolAssignments.length; si++) {
-      var sa = schoolAssignments[si];
-      if (sa.visit1Date) {
-        scheduleRows.push([targetMonth, sa.visit1Date, staffName, sa.schoolName, '1回目 ' + sa.visit1Rank, '仮', '']);
+    // 短い間隔で妥協
+    if (!assigned && requireDistanceFrom && fallbackDistance && fallbackDistance < minDistance) {
+      for (var wi = 0; wi < env.work.length; wi++) {
+        var wd = env.work[wi];
+        if (canUseSlot_(env.used, wd, req.slotKey) &&
+            dayDiff(requireDistanceFrom, wd) >= fallbackDistance) {
+          markSlotUsed_(env.used, wd, req.slotKey);
+          assigned = { date: wd, rank: '自動割当(間隔短)' };
+          break;
+        }
       }
-      if (sa.visit2Date) {
-        scheduleRows.push([targetMonth, sa.visit2Date, staffName, sa.schoolName, '2回目 ' + sa.visit2Rank, '仮', '']);
-      }
-      if (sa.visit3Date) {
-        scheduleRows.push([targetMonth, sa.visit3Date, staffName, sa.schoolName, '3回目 ' + sa.visit3Rank, '仮', '']);
-      }
+    }
 
-      // 第2候補以降で決まった学校は来月の優先スコアに加算
-      if (sa.visit1Rank && sa.visit1Rank.indexOf('第1') === -1 && sa.visit1Rank !== '割当不可') {
-        newPriorityScores[sa.schoolName] = (newPriorityScores[sa.schoolName] || 0) + 1;
-      }
-      if (sa.visit2Rank && sa.visit2Rank.indexOf('第1') === -1 && sa.visit2Rank !== '割当不可') {
-        newPriorityScores[sa.schoolName] = (newPriorityScores[sa.schoolName] || 0) + 1;
-      }
+    if (!assigned) {
+      assigned = { date: '', rank: '割当不可' };
+    }
+    return assigned;
+  }
+
+  // === Pass 1: 全Visit1 を確定 ===
+  var v1Requests = allRequests.filter(function(r) { return r.visitNum === 1; });
+  v1Requests.sort(function(a, b) { return b.priority - a.priority; });
+
+  for (var ri = 0; ri < v1Requests.length; ri++) {
+    var req = v1Requests[ri];
+    var result = assignRequest_(req, null, 0, 0);
+
+    if (result.date) schoolV1DateMap[req.schoolName] = result.date;
+    if (!assignmentsBySchool[req.schoolName]) assignmentsBySchool[req.schoolName] = [];
+    assignmentsBySchool[req.schoolName].push({
+      visitNum: 1, date: result.date, rank: result.rank,
+      staff: req.staff, supportType: req.supportType, timeSlot: req.timeSlot
+    });
+
+    if (result.rank.indexOf('第1') === -1 && result.rank !== '割当不可' && result.rank.indexOf('自動割当') === -1) {
+      newPriorityScores[req.schoolName] = (newPriorityScores[req.schoolName] || 0) + 1;
+    }
+  }
+
+  // === Pass 2: 全Visit2 を確定（同一校の v1 から5日以上空ける、不可なら3日以上） ===
+  var v2Requests = allRequests.filter(function(r) { return r.visitNum === 2; });
+  v2Requests.sort(function(a, b) { return b.priority - a.priority; });
+
+  for (var ri = 0; ri < v2Requests.length; ri++) {
+    var req = v2Requests[ri];
+    var v1Date = schoolV1DateMap[req.schoolName] || null;
+    var result = assignRequest_(req, v1Date, 5, 3);
+
+    if (!assignmentsBySchool[req.schoolName]) assignmentsBySchool[req.schoolName] = [];
+    assignmentsBySchool[req.schoolName].push({
+      visitNum: 2, date: result.date, rank: result.rank,
+      staff: req.staff, supportType: req.supportType, timeSlot: req.timeSlot
+    });
+
+    if (result.rank.indexOf('第1') === -1 && result.rank !== '割当不可' && result.rank.indexOf('自動割当') === -1) {
+      newPriorityScores[req.schoolName] = (newPriorityScores[req.schoolName] || 0) + 1;
+    }
+  }
+
+  // === scheduleRows を構築 ===
+  for (var sch in assignmentsBySchool) {
+    var ass = assignmentsBySchool[sch];
+    for (var k = 0; k < ass.length; k++) {
+      var a = ass[k];
+      if (!a.date) continue;
+      scheduleRows.push([
+        targetMonth, a.date, a.staff, sch,
+        a.visitNum + '回目 ' + a.rank,
+        '仮', '',
+        a.timeSlot || '',
+        a.supportType || '訪問'
+      ]);
     }
   }
 
   // --- 6. スケジュールシートに書き込み ---
-  var headers = ['対象年月', '日付', '支援員名', '学校名', '候補順位', 'ステータス', '元担当支援員'];
+  var headers = ['対象年月', '日付', '支援員名', '学校名', '候補順位', 'ステータス', '元担当支援員', '時間帯', '支援種別'];
   var sheet = getOrCreateSheet_(SHEET_SCHEDULE, headers);
+  ensureScheduleExtraColumns_(sheet);
 
   // 対象月の既存データをクリア
   var existing = sheet.getDataRange().getValues();
   for (var i = existing.length - 1; i >= 1; i--) {
-    if (String(existing[i][0]).trim() === targetMonth) {
+    if (normalizeTargetMonth_(existing[i][0]) === targetMonth) {
       sheet.deleteRow(i + 1);
     }
   }
@@ -2443,7 +2466,7 @@ function autoAssignSchedule() {
   if (scheduleRows.length > 0) {
     // 日付順にソート
     scheduleRows.sort(function(a, b) { return a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0; });
-    var insertRange = sheet.getRange(sheet.getLastRow() + 1, 1, scheduleRows.length, 7);
+    var insertRange = sheet.getRange(sheet.getLastRow() + 1, 1, scheduleRows.length, 9);
     insertRange.setNumberFormat('@');
     insertRange.setValues(scheduleRows);
   }
@@ -2454,11 +2477,14 @@ function autoAssignSchedule() {
   // 統計
   var v1Count = scheduleRows.filter(function(r) { return r[4].indexOf('1回目') !== -1; }).length;
   var v2Count = scheduleRows.filter(function(r) { return r[4].indexOf('2回目') !== -1; }).length;
-  var v3Count = scheduleRows.filter(function(r) { return r[4].indexOf('3回目') !== -1; }).length;
+  var visitCount = scheduleRows.filter(function(r) { return r[8] === '訪問'; }).length;
+  var onlineCount = scheduleRows.filter(function(r) { return r[8] === 'オンライン'; }).length;
 
   return {
     success: true,
-    message: 'スケジュール割り当て完了: 1回目=' + v1Count + '件, 2回目=' + v2Count + '件, 3回目=' + v3Count + '件（合計' + scheduleRows.length + '件）'
+    message: 'スケジュール割り当て完了: 1回目=' + v1Count + '件, 2回目=' + v2Count +
+             '件 / 訪問=' + visitCount + '件, オンライン=' + onlineCount +
+             '件（合計' + scheduleRows.length + '件）'
   };
 }
 
