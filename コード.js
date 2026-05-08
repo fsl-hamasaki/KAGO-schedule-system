@@ -1153,17 +1153,61 @@ function setupSchoolMaster() {
   }
   staffSheet.getRange(2, 1, staffMembers.length, 3).setValues(staffMembers);
 
-  // SAマスタにも登録
+  // SAマスタにも登録（専任SA + 支援員兼任SA）
   var saSheet = getOrCreateSheet_(SHEET_SA, ['メールアドレス', '氏名']);
   if (saSheet.getLastRow() > 1) {
     saSheet.getRange(2, 1, saSheet.getLastRow() - 1, 2).clearContent();
   }
-  saSheet.getRange(2, 1, 2, 2).setValues([
+  var saList = [
     ['ict0010@kago.ed.jp', '濵﨑 生'],
-    ['ict0002@kago.ed.jp', '山崎 混平']
-  ]);
+    ['ict0002@kago.ed.jp', '山崎 混平'],
+    // 支援員兼任SA（メイン役割は支援員、ログイン時はSA優先）
+    ['ict0006@kago.ed.jp', '橋口 大地'],
+    ['ict0007@kago.ed.jp', '谷川 麗華'],
+    ['ict0008@kago.ed.jp', '抜迫 大地'],
+    ['ict0009@kago.ed.jp', '中根 秀幸']
+  ];
+  saSheet.getRange(2, 1, saList.length, 2).setValues(saList);
 
-  return { success: true, message: '学校マスタ ' + schools.length + '校、支援員マスタ ' + staffMembers.length + '名、SAマスタを登録しました。' };
+  return { success: true, message: '学校マスタ ' + schools.length + '校、支援員マスタ ' + staffMembers.length + '名、SAマスタ ' + saList.length + '名を登録しました。' };
+}
+
+// 支援員兼任SA 4名の追加（既存SAマスタを保持したまま追記）
+function addDualRoleSAs() {
+  var sheet = getOrCreateSheet_(SHEET_SA, ['メールアドレス', '氏名']);
+  var data = sheet.getDataRange().getValues();
+  var existingEmails = {};
+  for (var i = 1; i < data.length; i++) {
+    var em = String(data[i][0] || '').trim();
+    if (em) existingEmails[em] = true;
+  }
+
+  var dualRoleSAs = [
+    ['ict0006@kago.ed.jp', '橋口 大地'],
+    ['ict0007@kago.ed.jp', '谷川 麗華'],
+    ['ict0008@kago.ed.jp', '抜迫 大地'],
+    ['ict0009@kago.ed.jp', '中根 秀幸']
+  ];
+
+  var toInsert = [];
+  var skipped = [];
+  for (var i = 0; i < dualRoleSAs.length; i++) {
+    var row = dualRoleSAs[i];
+    if (existingEmails[row[0]]) {
+      skipped.push(row[1]);
+    } else {
+      toInsert.push(row);
+    }
+  }
+
+  if (toInsert.length > 0) {
+    var startRow = sheet.getLastRow() + 1;
+    sheet.getRange(startRow, 1, toInsert.length, 2).setValues(toInsert);
+  }
+
+  var msg = toInsert.length + '名をSAマスタに追加しました。';
+  if (skipped.length > 0) msg += '（既存のためスキップ: ' + skipped.join('、') + '）';
+  return { success: true, message: msg };
 }
 
 // 枕崎市8校の追加（既存マスタを保持したまま追記）

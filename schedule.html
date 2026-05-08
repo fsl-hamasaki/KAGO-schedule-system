@@ -618,7 +618,7 @@
       <div class="card" style="margin-bottom: 20px;">
         <div class="form-group">
           <label>スケジュールに関するコメント<span style="font-weight:400; color:#5f6368; font-size:0.78rem; margin-left:6px;">（支援員には共有されません）</span></label>
-          <textarea id="comment" placeholder="例：今月に関しては、月の前半で支援を希望します"></textarea>
+          <textarea id="comment" placeholder="例：来月研究授業があるので、来月に支援が集中すると思います"></textarea>
         </div>
 
         <!-- ICT支援要望テーブル -->
@@ -927,17 +927,25 @@
   // ICT要望テーブル（可変行）
   var ictRowSeq = 0;
   var ICT_DEFAULT_ROWS = 3;
+  // デフォルト3行のplaceholder（授業支援・校務支援・設定）
+  var ICT_DEFAULT_PLACEHOLDERS = [
+    { content: '例：2年生のロイロノートで提出箱の使い方を教えてほしい', name: '2年担任 山田', room: '2年1組' },
+    { content: '例：成績集計のExcel関数の組み方を教えてほしい',           name: '教頭',         room: '職員室' },
+    { content: '例：新しく届いたタブレットの初期設定をしてほしい',         name: 'ICT担当 佐藤', room: 'PC教室' }
+  ];
+  var ICT_GENERIC_PLACEHOLDER = { content: '支援してほしい内容', name: '依頼者氏名', room: '場所' };
 
-  function buildIctRow(content, name, room) {
+  function buildIctRow(content, name, room, ph) {
+    ph = ph || ICT_GENERIC_PLACEHOLDER;
     ictRowSeq++;
     var rowId = 'ict_row_' + ictRowSeq;
     var tr = document.createElement('tr');
     tr.id = rowId;
     tr.innerHTML =
       '<td style="padding:4px 6px; border:1px solid #dadce0; text-align:center; color:#5f6368;" data-num></td>' +
-      '<td style="padding:2px; border:1px solid #dadce0;"><input type="text" data-field="content" style="width:100%; border:none; padding:6px 4px; font-size:0.85rem; font-family:inherit;" placeholder="例：タブレットの設定"></td>' +
-      '<td style="padding:2px; border:1px solid #dadce0;"><input type="text" data-field="name" style="width:100%; border:none; padding:6px 4px; font-size:0.85rem; font-family:inherit;" placeholder="山田太郎"></td>' +
-      '<td style="padding:2px; border:1px solid #dadce0;"><input type="text" data-field="room" style="width:100%; border:none; padding:6px 4px; font-size:0.85rem; font-family:inherit;" placeholder="PC教室"></td>' +
+      '<td style="padding:2px; border:1px solid #dadce0;"><input type="text" data-field="content" style="width:100%; border:none; padding:6px 4px; font-size:0.85rem; font-family:inherit;" placeholder="' + ph.content + '"></td>' +
+      '<td style="padding:2px; border:1px solid #dadce0;"><input type="text" data-field="name" style="width:100%; border:none; padding:6px 4px; font-size:0.85rem; font-family:inherit;" placeholder="' + ph.name + '"></td>' +
+      '<td style="padding:2px; border:1px solid #dadce0;"><input type="text" data-field="room" style="width:100%; border:none; padding:6px 4px; font-size:0.85rem; font-family:inherit;" placeholder="' + ph.room + '"></td>' +
       '<td style="padding:2px 6px; border:1px solid #dadce0; text-align:center;"><button type="button" class="ict-row-delete" title="この行を削除" onclick="removeIctRow(\'' + rowId + '\')">&#10005;</button></td>';
     if (content) tr.querySelector('[data-field="content"]').value = content;
     if (name) tr.querySelector('[data-field="name"]').value = name;
@@ -958,15 +966,17 @@
     body.innerHTML = '';
     ictRowSeq = 0;
 
-    var rowsToRender = [];
     if (items && items.length > 0) {
-      rowsToRender = items;
+      // 復元時: 値があるのでplaceholderはgeneric
+      for (var i = 0; i < items.length; i++) {
+        var it = items[i] || {};
+        body.appendChild(buildIctRow(it.content || '', it.name || '', it.room || '', ICT_GENERIC_PLACEHOLDER));
+      }
     } else {
-      for (var i = 0; i < ICT_DEFAULT_ROWS; i++) rowsToRender.push({});
-    }
-    for (var i = 0; i < rowsToRender.length; i++) {
-      var it = rowsToRender[i] || {};
-      body.appendChild(buildIctRow(it.content || '', it.name || '', it.room || ''));
+      // 初期状態: 行ごとに具体例のplaceholder
+      for (var i = 0; i < ICT_DEFAULT_ROWS; i++) {
+        body.appendChild(buildIctRow('', '', '', ICT_DEFAULT_PLACEHOLDERS[i]));
+      }
     }
     renumberIctRows();
   }
