@@ -311,11 +311,8 @@ function getSystemSettings_() {
     var key = String(data[i][0]).trim();
     var val = data[i][1];
     if (key === '対象年月') {
-      if (val instanceof Date) {
-        settings.targetMonth = Utilities.formatDate(val, 'Asia/Tokyo', 'yyyy-MM');
-      } else {
-        settings.targetMonth = String(val).trim();
-      }
+      // Date/文字列いずれの場合も yyyy-MM 形式に統一（月のゼロ埋めも保証）
+      settings.targetMonth = normalizeTargetMonth_(val);
     }
     if (key === '締切日') {
       if (val instanceof Date) {
@@ -352,7 +349,8 @@ function updateSystemSettings(newSettings) {
   for (var i = 1; i < data.length; i++) {
     var key = String(data[i][0]).trim();
     if (key === '対象年月' && newSettings.targetMonth !== undefined) {
-      sheet.getRange(i + 1, 2).setNumberFormat('@').setValue(newSettings.targetMonth);
+      // 月をゼロ埋めしてから保存（"2026-6" → "2026-06"）
+      sheet.getRange(i + 1, 2).setNumberFormat('@').setValue(normalizeTargetMonth_(newSettings.targetMonth));
     }
     if (key === '締切日' && newSettings.deadline !== undefined) {
       sheet.getRange(i + 1, 2).setValue(newSettings.deadline);
@@ -467,12 +465,17 @@ function getExistingCandidates_(email, targetMonth) {
   return null;
 }
 
-// 対象年月の値をyyyy-MM文字列に正規化（Date型・文字列いずれにも対応）
+// 対象年月の値をyyyy-MM文字列に正規化（Date型・文字列いずれにも対応、月のゼロ埋めも実施）
 function normalizeTargetMonth_(val) {
   if (val instanceof Date) {
     return Utilities.formatDate(val, 'Asia/Tokyo', 'yyyy-MM');
   }
-  return String(val == null ? '' : val).trim();
+  var s = String(val == null ? '' : val).trim();
+  var m = s.match(/^(\d{4})-(\d{1,2})$/);
+  if (m) {
+    return m[1] + '-' + ('0' + m[2]).slice(-2);
+  }
+  return s;
 }
 
 // 候補日列の値をyyyy-MM-dd文字列に正規化
@@ -1613,6 +1616,51 @@ function seededRand_(seed) {
     s = (s * 9301 + 49297) % 233280;
     return s / 233280;
   };
+}
+
+// SA画面が候補日を読み込めているかを診断（GASエディタで実行→ログ確認）
+function diagnoseSAPageQuery() {
+  var settings = getSystemSettings_();
+  var tm = settings.targetMonth;
+  Logger.log('--- settings.targetMonth ---');
+  Logger.log('value: ' + JSON.stringify(tm));
+  Logger.log('length: ' + (tm ? tm.length : 0));
+  Logger.log('charCodes: ' + (tm ? tm.split('').map(function(c){return c.charCodeAt(0);}).join(',') : ''));
+
+  var candidates = getAllCandidates_(tm);
+  Logger.log('--- getAllCandidates_(\"' + tm + '\") ---');
+  Logger.log('count: ' + candidates.length);
+  if (candidates.length > 0) {
+    Logger.log('first record email: ' + candidates[0].email);
+    Logger.log('first record schoolName: ' + candidates[0].schoolName);
+    Logger.log('first record targetMonth: ' + JSON.stringify(candidates[0].targetMonth));
+  }
+
+  // 念のため手動フィルタ件数も確認
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_CANDIDATES);
+  if (!sheet) { Logger.log('SHEET_CANDIDATES not found'); return; }
+  var data = sheet.getDataRange().getValues();
+  var match = 0, mismatch = 0, mismatchSamples = [];
+  for (var i = 1; i < data.length; i++) {
+    var rm = normalizeTargetMonth_(data[i][3]);
+    if (rm === tm) match++;
+    else {
+      mismatch++;
+      if (mismatchSamples.length < 3) {
+        mismatchSamples.push({
+          row: i + 1,
+          rawType: data[i][3] instanceof Date ? 'Date' : typeof data[i][3],
+          rawString: String(data[i][3]),
+          rawCharCodes: String(data[i][3]).split('').map(function(c){return c.charCodeAt(0);}).join(','),
+          normalized: rm
+        });
+      }
+    }
+  }
+  Logger.log('--- Manual filter check ---');
+  Logger.log('match: ' + match + ', mismatch: ' + mismatch);
+  Logger.log('mismatch samples: ' + JSON.stringify(mismatchSamples, null, 2));
 }
 
 // 候補日シートの対象年月・候補日列の実型と件数を診断（GASエディタで実行→ログ確認）
