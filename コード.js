@@ -305,19 +305,19 @@ function getSystemSettings_() {
     sheet.appendRow(['締切日', '']);
     sheet.appendRow(['ステータス', '']);
     sheet.appendRow(['開発モード', 'ON']);
-    return { targetMonth: '', deadline: '', status: '', devMode: 'ON' };
+    sheet.appendRow(['お知らせ', '']);
+    return { targetMonth: '', deadline: '', status: '', devMode: 'ON', announcement: '' };
   }
 
   var data = sheet.getDataRange().getValues();
-  var settings = { announcement: '' };
-  var hasDevMode = false;
-  var hasAnnouncement = false;
+  var settings = { targetMonth: '', deadline: '', status: '', devMode: '', announcement: '' };
+  var found = { targetMonth: false, deadline: false, status: false, devMode: false, announcement: false };
   for (var i = 1; i < data.length; i++) {
     var key = String(data[i][0]).trim();
     var val = data[i][1];
     if (key === '対象年月') {
-      // Date/文字列いずれの場合も yyyy-MM 形式に統一（月のゼロ埋めも保証）
       settings.targetMonth = normalizeTargetMonth_(val);
+      found.targetMonth = true;
     }
     if (key === '締切日') {
       if (val instanceof Date) {
@@ -325,21 +325,19 @@ function getSystemSettings_() {
       } else {
         settings.deadline = String(val).trim();
       }
+      found.deadline = true;
     }
-    if (key === 'ステータス') settings.status = String(val).trim();
-    if (key === '開発モード') { settings.devMode = String(val).trim(); hasDevMode = true; }
-    if (key === 'お知らせ') { settings.announcement = String(val == null ? '' : val); hasAnnouncement = true; }
+    if (key === 'ステータス') { settings.status = String(val).trim(); found.status = true; }
+    if (key === '開発モード') { settings.devMode = String(val).trim(); found.devMode = true; }
+    if (key === 'お知らせ') { settings.announcement = String(val == null ? '' : val); found.announcement = true; }
   }
 
-  // 開発モード行が未追加の場合、自動追加してONにする
-  if (!hasDevMode) {
-    sheet.appendRow(['開発モード', 'ON']);
-    settings.devMode = 'ON';
-  }
-  // お知らせ行が未追加の場合、自動追加（空文字）
-  if (!hasAnnouncement) {
-    sheet.appendRow(['お知らせ', '']);
-  }
+  // 必要な設定行が未追加の場合、自動追加（既存値はそのまま）
+  if (!found.targetMonth)  sheet.appendRow(['対象年月', '']);
+  if (!found.deadline)     sheet.appendRow(['締切日', '']);
+  if (!found.status)       sheet.appendRow(['ステータス', '']);
+  if (!found.devMode)      { sheet.appendRow(['開発モード', 'ON']); settings.devMode = 'ON'; }
+  if (!found.announcement) sheet.appendRow(['お知らせ', '']);
 
   return settings;
 }
@@ -350,25 +348,40 @@ function updateSystemSettings(newSettings) {
   if (!sheet) return { success: false, message: '設定シートが見つかりません。' };
 
   var data = sheet.getDataRange().getValues();
-  var foundAnnouncement = false;
+  var found = { targetMonth: false, deadline: false, status: false, announcement: false };
   for (var i = 1; i < data.length; i++) {
     var key = String(data[i][0]).trim();
     if (key === '対象年月' && newSettings.targetMonth !== undefined) {
       // 月をゼロ埋めしてから保存（"2026-6" → "2026-06"）
       sheet.getRange(i + 1, 2).setNumberFormat('@').setValue(normalizeTargetMonth_(newSettings.targetMonth));
+      found.targetMonth = true;
     }
     if (key === '締切日' && newSettings.deadline !== undefined) {
       sheet.getRange(i + 1, 2).setValue(newSettings.deadline);
+      found.deadline = true;
     }
     if (key === 'ステータス' && newSettings.status !== undefined) {
       sheet.getRange(i + 1, 2).setValue(newSettings.status);
+      found.status = true;
     }
     if (key === 'お知らせ' && newSettings.announcement !== undefined) {
       sheet.getRange(i + 1, 2).setValue(newSettings.announcement);
-      foundAnnouncement = true;
+      found.announcement = true;
     }
   }
-  if (newSettings.announcement !== undefined && !foundAnnouncement) {
+  // 行が無ければ追加（保存値が反映されないバグ防止）
+  if (newSettings.targetMonth !== undefined && !found.targetMonth) {
+    var r = sheet.getLastRow() + 1;
+    sheet.appendRow(['対象年月', '']);
+    sheet.getRange(r, 2).setNumberFormat('@').setValue(normalizeTargetMonth_(newSettings.targetMonth));
+  }
+  if (newSettings.deadline !== undefined && !found.deadline) {
+    sheet.appendRow(['締切日', newSettings.deadline]);
+  }
+  if (newSettings.status !== undefined && !found.status) {
+    sheet.appendRow(['ステータス', newSettings.status]);
+  }
+  if (newSettings.announcement !== undefined && !found.announcement) {
     sheet.appendRow(['お知らせ', newSettings.announcement]);
   }
 
