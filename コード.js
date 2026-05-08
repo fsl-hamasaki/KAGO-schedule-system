@@ -1110,7 +1110,16 @@ function setupSchoolMaster() {
     [1075, '伊集院高校', '抜迫 大地', 'ict0008@kago.ed.jp', '通常'],
     [1076, '市来農芸高校', '抜迫 大地', 'ict0008@kago.ed.jp', '通常'],
     [1077, '徳之島高校', '抜迫 大地', 'ict0008@kago.ed.jp', '離島'],
-    [1078, '沖永良部高校', '抜迫 大地', 'ict0008@kago.ed.jp', '離島']
+    [1078, '沖永良部高校', '抜迫 大地', 'ict0008@kago.ed.jp', '離島'],
+    // 村永 浩 ― 枕崎市（市町村案件）
+    [1079, '枕崎小学校', '村永 浩', 'ict0003@kago.ed.jp', '市町村'],
+    [1080, '桜山小学校', '村永 浩', 'ict0003@kago.ed.jp', '市町村'],
+    [1081, '別府小学校', '村永 浩', 'ict0003@kago.ed.jp', '市町村'],
+    [1082, '立神小学校', '村永 浩', 'ict0003@kago.ed.jp', '市町村'],
+    [1083, '枕崎中学校', '村永 浩', 'ict0003@kago.ed.jp', '市町村'],
+    [1084, '桜山中学校', '村永 浩', 'ict0003@kago.ed.jp', '市町村'],
+    [1085, '別府中学校', '村永 浩', 'ict0003@kago.ed.jp', '市町村'],
+    [1086, '立神中学校', '村永 浩', 'ict0003@kago.ed.jp', '市町村']
   ];
 
   var sheet = getOrCreateSheet_(SHEET_SCHOOLS, ['学校番号', '学校名', '担当支援員', '支援員メール', '支援区分']);
@@ -1155,6 +1164,54 @@ function setupSchoolMaster() {
   ]);
 
   return { success: true, message: '学校マスタ ' + schools.length + '校、支援員マスタ ' + staffMembers.length + '名、SAマスタを登録しました。' };
+}
+
+// 枕崎市8校の追加（既存マスタを保持したまま追記）
+function addMakurazakiSchools() {
+  var sheet = getOrCreateSheet_(SHEET_SCHOOLS, ['学校番号', '学校名', '担当支援員', '支援員メール', '支援区分']);
+  var data = sheet.getDataRange().getValues();
+
+  var existingNames = {};
+  var existingCodes = {};
+  for (var i = 1; i < data.length; i++) {
+    var code = String(data[i][0] || '').trim();
+    var name = String(data[i][1] || '').trim();
+    if (code) existingCodes[code] = true;
+    if (name) existingNames[name] = true;
+  }
+
+  var newSchools = [
+    [1079, '枕崎小学校', '村永 浩', 'ict0003@kago.ed.jp', '市町村'],
+    [1080, '桜山小学校', '村永 浩', 'ict0003@kago.ed.jp', '市町村'],
+    [1081, '別府小学校', '村永 浩', 'ict0003@kago.ed.jp', '市町村'],
+    [1082, '立神小学校', '村永 浩', 'ict0003@kago.ed.jp', '市町村'],
+    [1083, '枕崎中学校', '村永 浩', 'ict0003@kago.ed.jp', '市町村'],
+    [1084, '桜山中学校', '村永 浩', 'ict0003@kago.ed.jp', '市町村'],
+    [1085, '別府中学校', '村永 浩', 'ict0003@kago.ed.jp', '市町村'],
+    [1086, '立神中学校', '村永 浩', 'ict0003@kago.ed.jp', '市町村']
+  ];
+
+  var toInsert = [];
+  var skipped = [];
+  for (var i = 0; i < newSchools.length; i++) {
+    var row = newSchools[i];
+    var code = String(row[0]);
+    var name = String(row[1]);
+    if (existingCodes[code] || existingNames[name]) {
+      skipped.push(name);
+    } else {
+      toInsert.push(row);
+    }
+  }
+
+  if (toInsert.length > 0) {
+    var startRow = sheet.getLastRow() + 1;
+    sheet.getRange(startRow, 1, toInsert.length, 5).setValues(toInsert);
+  }
+
+  var msg = toInsert.length + '校を追加しました。';
+  if (skipped.length > 0) msg += '（既存のためスキップ: ' + skipped.join('、') + '）';
+  return { success: true, message: msg };
 }
 
 // ===== 5月サンプルデータ生成 =====

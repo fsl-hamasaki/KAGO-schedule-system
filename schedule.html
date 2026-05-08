@@ -235,16 +235,22 @@
     flex-shrink: 0;
   }
 
+  /* Candidate Grid (3 columns) */
+  .candidates-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+  }
+  @media (max-width: 760px) {
+    .candidates-grid { grid-template-columns: 1fr; }
+  }
+
   /* Candidate Item */
   .candidate-item {
-    margin-bottom: 16px;
-    padding-bottom: 16px;
-    border-bottom: 1px solid #f0f0f0;
-  }
-  .candidate-item:last-child {
-    margin-bottom: 0;
-    padding-bottom: 0;
-    border-bottom: none;
+    background: #f8f9fa;
+    border: 1px solid #e8eaed;
+    border-radius: 8px;
+    padding: 12px 14px;
   }
   .date-error {
     font-size: 0.78rem;
@@ -257,7 +263,7 @@
     font-size: 0.82rem;
     font-weight: 600;
     color: #5f6368;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
   }
   .candidate-label .required {
     color: #d93025;
@@ -268,7 +274,8 @@
   .choice-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    flex-wrap: wrap;
+    gap: 6px 8px;
     margin-bottom: 6px;
     font-size: 0.88rem;
   }
@@ -283,13 +290,14 @@
     user-select: none;
   }
   .choice-row input[type="date"] {
-    padding: 6px 10px;
+    flex: 1 1 130px;
+    min-width: 130px;
+    padding: 6px 8px;
     border: 1.5px solid #dadce0;
     border-radius: 6px;
-    font-size: 0.88rem;
+    font-size: 0.85rem;
     font-family: inherit;
     transition: border-color 0.15s;
-    margin-left: 4px;
   }
   .choice-row input[type="date"]:focus {
     outline: none;
@@ -393,6 +401,45 @@
     transition: background 0.15s;
   }
   .cal-nav-btn:hover { background: #f0f2f5; }
+
+  /* ICT Request Table */
+  .ict-row-delete {
+    background: transparent;
+    border: 1px solid transparent;
+    color: #9aa0a6;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 0.95rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .ict-row-delete:hover {
+    background: #fce8e6;
+    color: #d93025;
+    border-color: #fadad6;
+  }
+  .ict-add-btn {
+    margin-top: 10px;
+    background: #fff;
+    border: 1.5px dashed #1a73e8;
+    color: #1a73e8;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .ict-add-btn:hover { background: #e8f0fe; }
+  .ict-add-btn .plus { font-size: 1.1rem; line-height: 1; }
 </style>
 </head>
 <body>
@@ -577,7 +624,7 @@
         <!-- ICT支援要望テーブル -->
         <div class="form-group" style="margin-top:18px;">
           <label>ICT支援に関するご要望<span style="font-weight:400; color:#1a73e8; font-size:0.78rem; margin-left:6px;">（支援員に共有されます）</span></label>
-          <div style="font-size:0.78rem; color:#5f6368; margin-bottom:8px;">支援当日に対応してほしい内容をご記入ください（最大10件）</div>
+          <div style="font-size:0.78rem; color:#5f6368; margin-bottom:8px;">支援当日に対応してほしい内容をご記入ください</div>
           <div style="overflow-x:auto;">
             <table id="ictRequestTable" style="width:100%; border-collapse:collapse; font-size:0.85rem;">
               <thead>
@@ -586,11 +633,13 @@
                   <th style="padding:8px 6px; border:1px solid #dadce0; font-weight:600; color:#5f6368;">支援内容</th>
                   <th style="padding:8px 6px; border:1px solid #dadce0; font-weight:600; color:#5f6368; width:100px;">依頼者氏名</th>
                   <th style="padding:8px 6px; border:1px solid #dadce0; font-weight:600; color:#5f6368; width:100px;">場所（教室）</th>
+                  <th style="padding:8px 6px; border:1px solid #dadce0; font-weight:600; color:#5f6368; width:36px;"></th>
                 </tr>
               </thead>
               <tbody id="ictRequestBody"></tbody>
             </table>
           </div>
+          <button type="button" class="ict-add-btn" onclick="addIctRow()"><span class="plus">+</span>行を追加</button>
         </div>
 
         <div class="btn-row">
@@ -682,9 +731,11 @@
         document.getElementById('formArea').style.display = 'block';
         renderCandidates('visit1', 'v1');
         renderCandidates('visit2', 'v2');
-        renderIctRequestTable();
+        renderIctRequestTable([]);
         initIslandMode();
         restoreExisting();
+        // 市町村校は支援種別を訪問固定にする（既存データがオンラインだった場合の上書き含む）
+        initMunicipalMode();
       }
     }
   }
@@ -873,22 +924,75 @@
     targetMaxDate = tYear + '-' + String(tMonth).padStart(2, '0') + '-' + String(lastDayOfMonth).padStart(2, '0');
   }
 
-  // ICT要望テーブル生成
-  function renderIctRequestTable() {
-    var body = document.getElementById('ictRequestBody');
-    var html = '';
-    for (var i = 0; i < 10; i++) {
-      html += '<tr>';
-      html += '<td style="padding:4px 6px; border:1px solid #dadce0; text-align:center; color:#5f6368;">' + (i + 1) + '</td>';
-      html += '<td style="padding:2px; border:1px solid #dadce0;"><input type="text" id="ict_content_' + i + '" style="width:100%; border:none; padding:6px 4px; font-size:0.85rem; font-family:inherit;" placeholder="例：タブレットの設定"></td>';
-      html += '<td style="padding:2px; border:1px solid #dadce0;"><input type="text" id="ict_name_' + i + '" style="width:100%; border:none; padding:6px 4px; font-size:0.85rem; font-family:inherit;" placeholder="山田太郎"></td>';
-      html += '<td style="padding:2px; border:1px solid #dadce0;"><input type="text" id="ict_room_' + i + '" style="width:100%; border:none; padding:6px 4px; font-size:0.85rem; font-family:inherit;" placeholder="PC教室"></td>';
-      html += '</tr>';
+  // ICT要望テーブル（可変行）
+  var ictRowSeq = 0;
+  var ICT_DEFAULT_ROWS = 3;
+
+  function buildIctRow(content, name, room) {
+    ictRowSeq++;
+    var rowId = 'ict_row_' + ictRowSeq;
+    var tr = document.createElement('tr');
+    tr.id = rowId;
+    tr.innerHTML =
+      '<td style="padding:4px 6px; border:1px solid #dadce0; text-align:center; color:#5f6368;" data-num></td>' +
+      '<td style="padding:2px; border:1px solid #dadce0;"><input type="text" data-field="content" style="width:100%; border:none; padding:6px 4px; font-size:0.85rem; font-family:inherit;" placeholder="例：タブレットの設定"></td>' +
+      '<td style="padding:2px; border:1px solid #dadce0;"><input type="text" data-field="name" style="width:100%; border:none; padding:6px 4px; font-size:0.85rem; font-family:inherit;" placeholder="山田太郎"></td>' +
+      '<td style="padding:2px; border:1px solid #dadce0;"><input type="text" data-field="room" style="width:100%; border:none; padding:6px 4px; font-size:0.85rem; font-family:inherit;" placeholder="PC教室"></td>' +
+      '<td style="padding:2px 6px; border:1px solid #dadce0; text-align:center;"><button type="button" class="ict-row-delete" title="この行を削除" onclick="removeIctRow(\'' + rowId + '\')">&#10005;</button></td>';
+    if (content) tr.querySelector('[data-field="content"]').value = content;
+    if (name) tr.querySelector('[data-field="name"]').value = name;
+    if (room) tr.querySelector('[data-field="room"]').value = room;
+    return tr;
+  }
+
+  function renumberIctRows() {
+    var rows = document.querySelectorAll('#ictRequestBody tr');
+    for (var i = 0; i < rows.length; i++) {
+      var cell = rows[i].querySelector('[data-num]');
+      if (cell) cell.textContent = (i + 1);
     }
-    body.innerHTML = html;
+  }
+
+  function renderIctRequestTable(items) {
+    var body = document.getElementById('ictRequestBody');
+    body.innerHTML = '';
+    ictRowSeq = 0;
+
+    var rowsToRender = [];
+    if (items && items.length > 0) {
+      rowsToRender = items;
+    } else {
+      for (var i = 0; i < ICT_DEFAULT_ROWS; i++) rowsToRender.push({});
+    }
+    for (var i = 0; i < rowsToRender.length; i++) {
+      var it = rowsToRender[i] || {};
+      body.appendChild(buildIctRow(it.content || '', it.name || '', it.room || ''));
+    }
+    renumberIctRows();
+  }
+
+  function addIctRow() {
+    var body = document.getElementById('ictRequestBody');
+    body.appendChild(buildIctRow('', '', ''));
+    renumberIctRows();
+  }
+
+  function removeIctRow(rowId) {
+    var row = document.getElementById(rowId);
+    if (!row) return;
+    var body = document.getElementById('ictRequestBody');
+    if (body.children.length <= 1) {
+      // 最後の1行は中身だけクリアして残す
+      var inputs = row.querySelectorAll('input');
+      for (var i = 0; i < inputs.length; i++) inputs[i].value = '';
+      return;
+    }
+    row.parentNode.removeChild(row);
+    renumberIctRows();
   }
 
   var isIsland = (supportCategory === '離島');
+  var isMunicipal = (supportCategory === '市町村');
 
   // 離島校の初期化（終日固定表示に切り替え）
   function initIslandMode() {
@@ -896,6 +1000,21 @@
     for (var n = 1; n <= 2; n++) {
       document.getElementById('timeSlotVisitOptions' + n).style.display = 'none';
       document.getElementById('timeSlotIsland' + n).style.display = 'block';
+    }
+  }
+
+  // 市町村校の初期化（オンライン選択肢を非表示に＋訪問固定）
+  function initMunicipalMode() {
+    if (!isMunicipal) return;
+    for (var n = 1; n <= 2; n++) {
+      var nameAttr = 'supportType' + (n === 1 ? '' : '2');
+      var onlineRadio = document.querySelector('input[name="' + nameAttr + '"][value="オンライン"]');
+      if (onlineRadio && onlineRadio.parentElement) {
+        onlineRadio.parentElement.style.display = 'none';
+      }
+      var visitRadio = document.querySelector('input[name="' + nameAttr + '"][value="訪問"]');
+      if (visitRadio) visitRadio.checked = true;
+      onSupportTypeChange(n);
     }
   }
 
@@ -961,7 +1080,7 @@
 
   function renderCandidates(containerId, prefix) {
     var container = document.getElementById(containerId + 'Candidates');
-    var html = '';
+    var html = '<div class="candidates-grid">';
     var labels = ['第1候補', '第2候補', '第3候補'];
 
     for (var i = 0; i < 3; i++) {
@@ -991,6 +1110,7 @@
       html += '</div>';
     }
 
+    html += '</div>';
     container.innerHTML = html;
   }
 
@@ -1110,17 +1230,13 @@
     if (existing.ictRequest) {
       try {
         var items = JSON.parse(existing.ictRequest);
-        if (Array.isArray(items)) {
-          for (var i = 0; i < items.length && i < 10; i++) {
-            if (items[i].content) document.getElementById('ict_content_' + i).value = items[i].content;
-            if (items[i].name) document.getElementById('ict_name_' + i).value = items[i].name;
-            if (items[i].room) document.getElementById('ict_room_' + i).value = items[i].room;
-          }
+        if (Array.isArray(items) && items.length > 0) {
+          renderIctRequestTable(items);
         }
       } catch(e) {
         // 旧形式（テキスト）の場合は1行目に入れる
         if (existing.ictRequest.trim()) {
-          document.getElementById('ict_content_0').value = existing.ictRequest;
+          renderIctRequestTable([{ content: existing.ictRequest, name: '', room: '' }]);
         }
       }
     }
@@ -1204,10 +1320,12 @@
 
     // ICT要望テーブルをJSON化
     var ictItems = [];
-    for (var i = 0; i < 10; i++) {
-      var content = document.getElementById('ict_content_' + i).value.trim();
-      var name = document.getElementById('ict_name_' + i).value.trim();
-      var room = document.getElementById('ict_room_' + i).value.trim();
+    var ictRows = document.querySelectorAll('#ictRequestBody tr');
+    for (var i = 0; i < ictRows.length; i++) {
+      var row = ictRows[i];
+      var content = row.querySelector('[data-field="content"]').value.trim();
+      var name = row.querySelector('[data-field="name"]').value.trim();
+      var room = row.querySelector('[data-field="room"]').value.trim();
       if (content || name || room) {
         ictItems.push({ content: content, name: name, room: room });
       }
