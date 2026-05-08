@@ -429,7 +429,7 @@
             chipStyle += 'background:#fff3e0; color:#e65100;';
             html += '<div style="' + chipStyle + '" title="' + esc(entry.origStaff) + 'の代行">' + iconHtml + esc(schoolShort) + ' (代行)</div>';
           } else if (isOnline) {
-            chipStyle += 'background:#f3e8fd; color:#6b21a8; border:1px solid #d8b4fe;';
+            chipStyle += 'background:#cffafe; color:#155e75; border:1px solid #a5f3fc;';
             html += '<div style="' + chipStyle + '"' + titleHtmlAttr + '>' + iconHtml + esc(schoolShort) + '</div>';
           } else {
             chipStyle += 'background:#e8f0fe; color:#1a73e8;';
@@ -450,7 +450,7 @@
     html += '<div class="legend-item"><div class="legend-dot" style="background:#f3e8fd;"></div>休日（承認済）</div>';
     html += '<div class="legend-item"><div class="legend-dot" style="background:#fff8e1; outline:1px dashed #f9ab00;"></div>休日（申請中）</div>';
     html += '<div class="legend-item"><div class="legend-dot" style="background:#e8f0fe;border:1px solid #1a73e8;"></div>訪問</div>';
-    html += '<div class="legend-item"><div class="legend-dot" style="background:#f3e8fd;border:1px solid #d8b4fe;"></div>💻オンライン</div>';
+    html += '<div class="legend-item"><div class="legend-dot" style="background:#cffafe;border:1px solid #a5f3fc;"></div>💻オンライン</div>';
     html += '<div class="legend-item"><div class="legend-dot" style="background:#fff3e0;border:1px solid #e65100;"></div>代行</div>';
     html += '</div>';
     document.getElementById('calArea').innerHTML = html;

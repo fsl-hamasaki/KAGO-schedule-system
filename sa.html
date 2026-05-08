@@ -406,7 +406,7 @@
   .school-chip.v2 { background: #e6f4ea; color: #137333; }
   .school-chip.v3 { background: #fff3e0; color: #e65100; }
   .school-chip.manual { background: #fce8e6; color: #c5221f; }
-  .school-chip.online { background: #f3e8fd; color: #6b21a8; border: 1px solid #d8b4fe; }
+  .school-chip.online { background: #cffafe; color: #155e75; border: 1px solid #a5f3fc; }
   .school-chip.online .online-icon { margin-right: 2px; }
   .school-chip:hover { opacity: 0.8; }
   .staff-label { font-weight: 400; font-size: 0.58rem; color: #80868b; text-decoration: underline; }
@@ -541,7 +541,10 @@
 
         <!-- Unassigned Schools -->
         <div class="card" id="unassignedCard" style="display:none;">
-          <div class="card-title">未割当の学校</div>
+          <div class="card-title">
+            未割当の学校
+            <span id="unassignedMonthLabel" style="font-weight:400; color:#5f6368; font-size:0.82rem; margin-left:8px;"></span>
+          </div>
           <div id="unassignedList"></div>
         </div>
       </div>
@@ -1579,7 +1582,7 @@
       calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#e8f0fe;border:1px solid #1a73e8;"></div>1回目</div>';
       calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#e6f4ea;border:1px solid #137333;"></div>2回目</div>';
       calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#fff3e0;border:1px solid #e65100;"></div>3回目</div>';
-      calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#f3e8fd;border:1px solid #d8b4fe;"></div>💻オンライン</div>';
+      calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#cffafe;border:1px solid #a5f3fc;"></div>💻オンライン</div>';
       calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#f8f9fa;border:1.5px dashed #9aa0a6;"></div>代行</div>';
       calendarsHtml += '</div>';
       calendarsHtml += '</div>';
@@ -1591,7 +1594,7 @@
       calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#e8f0fe;border:1px solid #1a73e8;"></div>1回目</div>';
       calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#e6f4ea;border:1px solid #137333;"></div>2回目</div>';
       calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#fff3e0;border:1px solid #e65100;"></div>3回目</div>';
-      calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#f3e8fd;border:1px solid #d8b4fe;"></div>💻オンライン</div>';
+      calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#cffafe;border:1px solid #a5f3fc;"></div>💻オンライン</div>';
       calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#f8f9fa;border:1.5px dashed #9aa0a6;"></div>代行</div>';
       calendarsHtml += '</div>';
       calendarsHtml += '</div>';
@@ -1614,7 +1617,7 @@
         calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#e8f0fe;border:1px solid #1a73e8;"></div>1回目</div>';
         calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#e6f4ea;border:1px solid #137333;"></div>2回目</div>';
         calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#fff3e0;border:1px solid #e65100;"></div>3回目</div>';
-      calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#f3e8fd;border:1px solid #d8b4fe;"></div>💻オンライン</div>';
+      calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#cffafe;border:1px solid #a5f3fc;"></div>💻オンライン</div>';
       calendarsHtml += '<div class="chip-legend-item"><div class="chip-legend-dot" style="background:#f8f9fa;border:1.5px dashed #9aa0a6;"></div>代行</div>';
         calendarsHtml += '</div>';
         calendarsHtml += '</div>';
@@ -1625,6 +1628,10 @@
     // 未割当
     var unassigned = getUnassignedSchools();
     var uCard = document.getElementById('unassignedCard');
+    var uMonthLabel = document.getElementById('unassignedMonthLabel');
+    if (uMonthLabel && settings.targetMonth) {
+      uMonthLabel.textContent = '（' + formatMonth(settings.targetMonth) + '分）';
+    }
     if (unassigned.length > 0) {
       uCard.style.display = 'block';
       var uHtml = '<table class="data-table"><thead><tr><th>学校名</th><th>担当支援員</th><th>状況</th><th></th></tr></thead><tbody>';
@@ -1811,7 +1818,8 @@
   }
 
   function getUnassignedSchools() {
-    // 候補日を出した学校のうち、1回目・2回目の両方が割り当てられていない学校
+    // 候補日を出した学校のうち、本人が希望した支援が割り当てられていない学校
+    // （現在の対象月＝settings.targetMonthのみ。candidates 自体が対象月で絞られている）
     var assignedMap = {};
     for (var i = 0; i < scheduleData.length; i++) {
       var s = scheduleData[i];
@@ -1823,12 +1831,12 @@
     var result = [];
     for (var i = 0; i < candidates.length; i++) {
       var c = candidates[i];
-      var a = assignedMap[c.schoolName];
-      if (!a) {
-        result.push({ schoolName: c.schoolName, staffName: getStaffForSchool(c.schoolName), reason: '未割当' });
-      } else if (!a.v1) {
+      var a = assignedMap[c.schoolName] || { v1: false, v2: false };
+
+      if (!a.v1) {
         result.push({ schoolName: c.schoolName, staffName: getStaffForSchool(c.schoolName), reason: '1回目未割当' });
-      } else if (!a.v2) {
+      } else if (c.wantSecond && !a.v2) {
+        // 2回目を希望した学校だけ未割当として表示
         result.push({ schoolName: c.schoolName, staffName: getStaffForSchool(c.schoolName), reason: '2回目未割当' });
       }
     }
