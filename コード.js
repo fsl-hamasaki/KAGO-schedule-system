@@ -399,7 +399,7 @@ function submitCandidates(formData) {
   var data = sheet.getDataRange().getValues();
   var existingRow = -1;
   for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === email && String(data[i][3]).trim() === settings.targetMonth) {
+    if (data[i][0] === email && normalizeTargetMonth_(data[i][3]) === settings.targetMonth) {
       existingRow = i + 1;
       break;
     }
@@ -443,19 +443,19 @@ function getExistingCandidates_(email, targetMonth) {
 
   var data = sheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
-    if (data[i][0] === email && String(data[i][3]).trim() === targetMonth) {
+    if (data[i][0] === email && normalizeTargetMonth_(data[i][3]) === targetMonth) {
       return {
         supportType: String(data[i][4]),
         timeSlot: String(data[i][5]),
-        v1c1: String(data[i][6]),
-        v1c2: String(data[i][7]),
-        v1c3: String(data[i][8]),
+        v1c1: normalizeCandidateDate_(data[i][6]),
+        v1c2: normalizeCandidateDate_(data[i][7]),
+        v1c3: normalizeCandidateDate_(data[i][8]),
         wantSecond: String(data[i][9]) === 'はい',
         supportType2: String(data[i][10]),
         timeSlot2: String(data[i][11]),
-        v2c1: String(data[i][12]),
-        v2c2: String(data[i][13]),
-        v2c3: String(data[i][14]),
+        v2c1: normalizeCandidateDate_(data[i][12]),
+        v2c2: normalizeCandidateDate_(data[i][13]),
+        v2c3: normalizeCandidateDate_(data[i][14]),
         comment: String(data[i][15]),
         ictRequest: String(data[i][17] == null ? '' : data[i][17]),
         submittedAt: data[i][16] instanceof Date
@@ -467,6 +467,22 @@ function getExistingCandidates_(email, targetMonth) {
   return null;
 }
 
+// 対象年月の値をyyyy-MM文字列に正規化（Date型・文字列いずれにも対応）
+function normalizeTargetMonth_(val) {
+  if (val instanceof Date) {
+    return Utilities.formatDate(val, 'Asia/Tokyo', 'yyyy-MM');
+  }
+  return String(val == null ? '' : val).trim();
+}
+
+// 候補日列の値をyyyy-MM-dd文字列に正規化
+function normalizeCandidateDate_(val) {
+  if (val instanceof Date) {
+    return Utilities.formatDate(val, 'Asia/Tokyo', 'yyyy-MM-dd');
+  }
+  return String(val == null ? '' : val).trim();
+}
+
 function getAllCandidates_(targetMonth) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName(SHEET_CANDIDATES);
@@ -475,23 +491,24 @@ function getAllCandidates_(targetMonth) {
   var data = sheet.getDataRange().getValues();
   var results = [];
   for (var i = 1; i < data.length; i++) {
-    if (targetMonth && String(data[i][3]).trim() !== targetMonth) continue;
+    var rowMonth = normalizeTargetMonth_(data[i][3]);
+    if (targetMonth && rowMonth !== targetMonth) continue;
     results.push({
       email: String(data[i][0]),
       schoolName: String(data[i][1]),
       name: String(data[i][2]),
-      targetMonth: String(data[i][3]),
+      targetMonth: rowMonth,
       supportType: String(data[i][4]),
       timeSlot: String(data[i][5]),
-      v1c1: String(data[i][6]),
-      v1c2: String(data[i][7]),
-      v1c3: String(data[i][8]),
+      v1c1: normalizeCandidateDate_(data[i][6]),
+      v1c2: normalizeCandidateDate_(data[i][7]),
+      v1c3: normalizeCandidateDate_(data[i][8]),
       wantSecond: String(data[i][9]) === 'はい',
       supportType2: String(data[i][10]),
       timeSlot2: String(data[i][11]),
-      v2c1: String(data[i][12]),
-      v2c2: String(data[i][13]),
-      v2c3: String(data[i][14]),
+      v2c1: normalizeCandidateDate_(data[i][12]),
+      v2c2: normalizeCandidateDate_(data[i][13]),
+      v2c3: normalizeCandidateDate_(data[i][14]),
       comment: String(data[i][15]),
       ictRequest: String(data[i][17] == null ? '' : data[i][17]),
       submittedAt: data[i][16] instanceof Date
@@ -1392,11 +1409,13 @@ function setupSampleDataJunJul2026() {
 
   if (allRows.length > 0) {
     var startRow = candSheet.getLastRow() + 1;
-    // 対象年月（4列目）と候補日列（7-9, 13-15列目）を文字列フォーマットに
-    candSheet.getRange(startRow, 4, allRows.length, 1).setNumberFormat('@');
-    candSheet.getRange(startRow, 7, allRows.length, 3).setNumberFormat('@');
-    candSheet.getRange(startRow, 13, allRows.length, 3).setNumberFormat('@');
-    candSheet.getRange(startRow, 1, allRows.length, candHeaders.length).setValues(allRows);
+    // 先に範囲を確保し、対象年月・候補日列を文字列フォーマットに固定
+    var fullRange = candSheet.getRange(startRow, 1, allRows.length, candHeaders.length);
+    fullRange.setNumberFormat('@');  // 全列を一旦文字列扱いに
+    SpreadsheetApp.flush();
+    fullRange.setValues(allRows);
+    // 送信日時（17列目）だけは日付フォーマットに戻す
+    candSheet.getRange(startRow, 17, allRows.length, 1).setNumberFormat('yyyy/mm/dd hh:mm');
   }
 
   // 集計
@@ -1593,6 +1612,87 @@ function seededRand_(seed) {
   return function() {
     s = (s * 9301 + 49297) % 233280;
     return s / 233280;
+  };
+}
+
+// 候補日シートの対象年月・候補日列の実型と件数を診断（GASエディタで実行→ログ確認）
+function diagnoseCandidatesSheet() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_CANDIDATES);
+  if (!sheet) return { success: false, message: '候補日シートが見つかりません' };
+  var data = sheet.getDataRange().getValues();
+  var summary = { totalRows: data.length - 1, byTargetMonth: {}, columnTypes: {} };
+  if (data.length > 1) {
+    var sampleRow = data[1];
+    summary.columnTypes = {
+      '対象年月(col4)': sampleRow[3] instanceof Date ? 'Date' : typeof sampleRow[3],
+      'v1c1(col7)': sampleRow[6] instanceof Date ? 'Date' : typeof sampleRow[6],
+      'v2c1(col13)': sampleRow[12] instanceof Date ? 'Date' : typeof sampleRow[12],
+      '送信日時(col17)': sampleRow[16] instanceof Date ? 'Date' : typeof sampleRow[16]
+    };
+    summary.sampleRowMonthRaw = String(sampleRow[3]);
+    summary.sampleRowMonthNormalized = normalizeTargetMonth_(sampleRow[3]);
+  }
+  for (var i = 1; i < data.length; i++) {
+    var m = normalizeTargetMonth_(data[i][3]);
+    summary.byTargetMonth[m] = (summary.byTargetMonth[m] || 0) + 1;
+  }
+  Logger.log(JSON.stringify(summary, null, 2));
+  return { success: true, summary: summary };
+}
+
+// 候補日シートの対象年月・候補日列がDate型で格納されていた場合、yyyy-MM文字列に修復
+function repairCandidatesSheetDateColumns() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_CANDIDATES);
+  if (!sheet) return { success: false, message: '候補日シートが見つかりません' };
+  if (sheet.getLastRow() < 2) return { success: true, message: 'データがありません' };
+
+  var lastRow = sheet.getLastRow();
+  var fixedMonth = 0, fixedDates = 0;
+
+  // 対象年月列(4)
+  var monthRange = sheet.getRange(2, 4, lastRow - 1, 1);
+  var monthVals = monthRange.getValues();
+  for (var i = 0; i < monthVals.length; i++) {
+    if (monthVals[i][0] instanceof Date) {
+      monthVals[i][0] = Utilities.formatDate(monthVals[i][0], 'Asia/Tokyo', 'yyyy-MM');
+      fixedMonth++;
+    }
+  }
+  monthRange.setNumberFormat('@');
+  SpreadsheetApp.flush();
+  monthRange.setValues(monthVals);
+
+  // 候補日列(7-9, 13-15)
+  var dateColGroups = [
+    { start: 7, count: 3 },
+    { start: 13, count: 3 }
+  ];
+  for (var g = 0; g < dateColGroups.length; g++) {
+    var grp = dateColGroups[g];
+    var range = sheet.getRange(2, grp.start, lastRow - 1, grp.count);
+    var vals = range.getValues();
+    var changed = false;
+    for (var i = 0; i < vals.length; i++) {
+      for (var j = 0; j < vals[i].length; j++) {
+        if (vals[i][j] instanceof Date) {
+          vals[i][j] = Utilities.formatDate(vals[i][j], 'Asia/Tokyo', 'yyyy-MM-dd');
+          fixedDates++;
+          changed = true;
+        }
+      }
+    }
+    if (changed) {
+      range.setNumberFormat('@');
+      SpreadsheetApp.flush();
+      range.setValues(vals);
+    }
+  }
+
+  return {
+    success: true,
+    message: '対象年月 ' + fixedMonth + '件、候補日 ' + fixedDates + '件を文字列に修復しました'
   };
 }
 
