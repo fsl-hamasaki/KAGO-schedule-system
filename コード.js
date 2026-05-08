@@ -1258,6 +1258,344 @@ function addMakurazakiSchools() {
   return { success: true, message: msg };
 }
 
+// ===== 6月・7月サンプルデータ生成 =====
+
+// メイン関数: 6月+7月のサンプルデータをまとめて投入（既存5月データは保持、追記モード）
+function setupSampleDataJunJul2026() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // 1. 学校マスタを読み込み
+  var schoolSheet = ss.getSheetByName(SHEET_SCHOOLS);
+  if (!schoolSheet) return { success: false, message: '学校マスタが見つかりません' };
+  var schoolData = schoolSheet.getDataRange().getValues();
+  var allSchools = [];
+  for (var i = 1; i < schoolData.length; i++) {
+    if (!schoolData[i][0] || !schoolData[i][1]) continue;
+    var category = String(schoolData[i][4] || '通常').trim();
+    allSchools.push({
+      code: String(schoolData[i][0]).trim(),
+      name: String(schoolData[i][1]).trim(),
+      category: category,
+      isIsland: category === '離島',
+      isMakurazaki: category === '市町村'
+    });
+  }
+
+  // 2. サンプル教員氏名（romaji付き）
+  var TEACHER_NAMES = [
+    { sn: '田中', fn: '太郎',     rsn: 'tanaka' },
+    { sn: '佐藤', fn: '花子',     rsn: 'sato' },
+    { sn: '鈴木', fn: '一郎',     rsn: 'suzuki' },
+    { sn: '高橋', fn: '美咲',     rsn: 'takahashi' },
+    { sn: '渡辺', fn: '健太',     rsn: 'watanabe' },
+    { sn: '伊藤', fn: '裕子',     rsn: 'ito' },
+    { sn: '山本', fn: '大輔',     rsn: 'yamamoto' },
+    { sn: '中村', fn: 'あゆみ',   rsn: 'nakamura' },
+    { sn: '小林', fn: '翔',       rsn: 'kobayashi' },
+    { sn: '加藤', fn: '真由美',   rsn: 'kato' },
+    { sn: '吉田', fn: '拓也',     rsn: 'yoshida' },
+    { sn: '山田', fn: '恵子',     rsn: 'yamada' },
+    { sn: '松本', fn: '直樹',     rsn: 'matsumoto' },
+    { sn: '井上', fn: '智子',     rsn: 'inoue' },
+    { sn: '木村', fn: '雄一',     rsn: 'kimura' },
+    { sn: '林',   fn: '由美',     rsn: 'hayashi' },
+    { sn: '斎藤', fn: '誠',       rsn: 'saito' },
+    { sn: '清水', fn: '京子',     rsn: 'shimizu' },
+    { sn: '山口', fn: '正',       rsn: 'yamaguchi' },
+    { sn: '森',   fn: '節子',     rsn: 'mori' }
+  ];
+  var ROLES = ['教頭', 'ICT担当', '情報教育担当', '研究主任'];
+
+  // 3. 教員アカウント生成（既存と重複しないものだけ追加）
+  var userSheet = getOrCreateSheet_(SHEET_USERS, ['メールアドレス', '学校名', '氏名', '担当', '登録日時']);
+  var existingEmails = {};
+  if (userSheet.getLastRow() > 1) {
+    var ed = userSheet.getRange(2, 1, userSheet.getLastRow() - 1, 5).getValues();
+    for (var i = 0; i < ed.length; i++) {
+      var em = String(ed[i][0]).trim();
+      if (em) existingEmails[em] = true;
+    }
+  }
+
+  var newUsers = [];
+  for (var i = 0; i < allSchools.length; i++) {
+    var school = allSchools[i];
+    var nameInfo = TEACHER_NAMES[i % TEACHER_NAMES.length];
+    var email;
+    if (school.isMakurazaki) {
+      // 市町村: t + 学校番号 + 苗字頭文字 (例: t1079t@kago.ed.jp)
+      email = 't' + school.code + nameInfo.rsn.charAt(0) + '@kago.ed.jp';
+    } else {
+      // 県立高校: s-苗字 + 学校番号 (例: s-tanaka1001@kago.ed.jp)
+      email = 's-' + nameInfo.rsn + school.code + '@kago.ed.jp';
+    }
+    school.teacherEmail = email;
+    school.teacherName = nameInfo.sn + ' ' + nameInfo.fn;
+    school.teacherRole = ROLES[i % ROLES.length];
+
+    if (!existingEmails[email]) {
+      var regDate = new Date(2026, 4, 10 + (i % 15)); // 5月10〜24日に登録
+      newUsers.push([email, school.name, school.teacherName, school.teacherRole, regDate]);
+    }
+  }
+  if (newUsers.length > 0) {
+    userSheet.getRange(userSheet.getLastRow() + 1, 1, newUsers.length, 5).setValues(newUsers);
+  }
+
+  // 4. 候補日生成（6月+7月）
+  var candHeaders = [
+    'メールアドレス', '学校名', '氏名', '対象年月',
+    '支援種別', '時間帯',
+    '1回目_第1候補', '1回目_第2候補', '1回目_第3候補',
+    '2回目希望', '2回目_支援種別', '2回目_時間帯',
+    '2回目_第1候補', '2回目_第2候補', '2回目_第3候補',
+    '備考', '送信日時', 'ICT支援要望'
+  ];
+  var candSheet = getOrCreateSheet_(SHEET_CANDIDATES, candHeaders);
+
+  var weekdaysJun = getWeekdaysInMonth_(2026, 6);
+  var weekdaysJul = getWeekdaysInMonth_(2026, 7);
+
+  var allRows = [];
+  for (var i = 0; i < allSchools.length; i++) {
+    var school = allSchools[i];
+    var rand = seededRand_(parseInt(school.code) * 31 + 17);
+
+    var junePlan, julyPlan;
+    if (school.isMakurazaki) {
+      // 枕崎: 6月・7月どちらも訪問1回必須
+      junePlan = { v: 1, o: 0 };
+      julyPlan = { v: 1, o: 0 };
+    } else {
+      // 県立高校: 2か月合計の訪問・オンライン回数を抽選し、月ごとに分配
+      var totalV = pickWeighted_([
+        { v: 0, w: 25 }, { v: 1, w: 55 }, { v: 2, w: 18 }, { v: 3, w: 2 }
+      ], rand());
+      var totalO = pickWeighted_([
+        { v: 0, w: 60 }, { v: 1, w: 30 }, { v: 2, w: 10 }
+      ], rand());
+      junePlan = { v: 0, o: 0 };
+      julyPlan = { v: 0, o: 0 };
+      for (var k = 0; k < totalV; k++) {
+        if (rand() < 0.5) junePlan.v++; else julyPlan.v++;
+      }
+      for (var k = 0; k < totalO; k++) {
+        if (rand() < 0.5) junePlan.o++; else julyPlan.o++;
+      }
+    }
+
+    var juneRow = buildCandidateRow_(school, '2026-06', junePlan, weekdaysJun, rand, i);
+    if (juneRow) allRows.push(juneRow);
+    var julyRow = buildCandidateRow_(school, '2026-07', julyPlan, weekdaysJul, rand, i + 100);
+    if (julyRow) allRows.push(julyRow);
+  }
+
+  if (allRows.length > 0) {
+    var startRow = candSheet.getLastRow() + 1;
+    // 対象年月（4列目）と候補日列（7-9, 13-15列目）を文字列フォーマットに
+    candSheet.getRange(startRow, 4, allRows.length, 1).setNumberFormat('@');
+    candSheet.getRange(startRow, 7, allRows.length, 3).setNumberFormat('@');
+    candSheet.getRange(startRow, 13, allRows.length, 3).setNumberFormat('@');
+    candSheet.getRange(startRow, 1, allRows.length, candHeaders.length).setValues(allRows);
+  }
+
+  // 集計
+  var juneCount = 0, julyCount = 0;
+  for (var i = 0; i < allRows.length; i++) {
+    if (allRows[i][3] === '2026-06') juneCount++;
+    else if (allRows[i][3] === '2026-07') julyCount++;
+  }
+
+  return {
+    success: true,
+    message: 'サンプルデータ生成完了: 教員追加 ' + newUsers.length + '名、候補日 6月 ' + juneCount + '件 / 7月 ' + julyCount + '件'
+  };
+}
+
+// 1校1月分の候補日レコードを構築
+function buildCandidateRow_(school, targetMonth, plan, weekdays, rand, submitIdx) {
+  if (plan.v + plan.o === 0) return null;
+
+  var supportType = '', timeSlot = '', v1c1 = '', v1c2 = '', v1c3 = '';
+  var wantSecond = false, supportType2 = '', timeSlot2 = '';
+  var v2c1 = '', v2c2 = '', v2c3 = '';
+  var comment = '';
+
+  // 1回目: 訪問優先
+  if (plan.v >= 1) {
+    supportType = '訪問';
+    timeSlot = school.isIsland ? '09:00-16:00' : (rand() < 0.5 ? '09:00-12:00' : '13:30-16:30');
+  } else {
+    supportType = 'オンライン';
+    timeSlot = pickOnlineTime_(rand);
+  }
+  var p1 = pick3Dates_(weekdays, rand);
+  v1c1 = p1[0] || '特に指定しない';
+  v1c2 = p1[1] || '特に指定しない';
+  v1c3 = p1[2] || '特に指定しない';
+
+  // 2回目
+  var vRem = plan.v - (supportType === '訪問' ? 1 : 0);
+  var oRem = plan.o - (supportType === 'オンライン' ? 1 : 0);
+
+  if (vRem >= 1) {
+    wantSecond = true;
+    supportType2 = '訪問';
+    timeSlot2 = school.isIsland ? '09:00-16:00' : (rand() < 0.5 ? '09:00-12:00' : '13:30-16:30');
+    var p2 = pick3Dates_(weekdays, rand);
+    v2c1 = p2[0] || '特に指定しない';
+    v2c2 = p2[1] || '特に指定しない';
+    v2c3 = p2[2] || '特に指定しない';
+    vRem--;
+  } else if (oRem >= 1) {
+    wantSecond = true;
+    supportType2 = 'オンライン';
+    timeSlot2 = pickOnlineTime_(rand);
+    var p2 = pick3Dates_(weekdays, rand);
+    v2c1 = p2[0] || '特に指定しない';
+    v2c2 = p2[1] || '特に指定しない';
+    v2c3 = p2[2] || '特に指定しない';
+    oRem--;
+  }
+
+  // 余り（同月内で2枠を超える要望）はコメントへ
+  if (vRem > 0 || oRem > 0) {
+    var parts = [];
+    if (vRem > 0) parts.push('追加で訪問支援を' + vRem + '回お願いしたい予定があります');
+    if (oRem > 0) parts.push('追加でオンライン支援を' + oRem + '回お願いしたい予定があります');
+    comment = parts.join('。') + '。';
+  } else if (rand() < 0.05) {
+    // 5%でランダムに「対象月以降」コメントを付与
+    var ADVANCE_COMMENTS = [
+      '対象月以降の支援予定として、来月にも研究授業前の訪問支援をお願いしたいです。',
+      '夏休み中の校内研修支援についても、別途相談させてください。',
+      '秋以降のオンライン支援を継続的にお願いしたい予定です。',
+      '次年度の年間計画について、別途打ち合わせをお願いしたいです。'
+    ];
+    comment = ADVANCE_COMMENTS[Math.floor(rand() * ADVANCE_COMMENTS.length)];
+  }
+
+  // ICT要望
+  var ictRequest = generateIctRequestSample_(rand);
+
+  // 送信日時（対象月の前月15〜25日のランダム時刻）
+  var tp = targetMonth.split('-');
+  var ty = parseInt(tp[0], 10);
+  var tm = parseInt(tp[1], 10);
+  var prevMonth = tm - 1, prevYear = ty;
+  if (prevMonth === 0) { prevMonth = 12; prevYear--; }
+  var submitDate = new Date(prevYear, prevMonth - 1, 15 + (submitIdx % 11), 9 + (submitIdx % 8), (submitIdx * 7) % 60);
+
+  return [
+    school.teacherEmail, school.name, school.teacherName, targetMonth,
+    supportType, timeSlot,
+    v1c1, v1c2, v1c3,
+    wantSecond ? 'はい' : 'いいえ',
+    supportType2, timeSlot2,
+    v2c1, v2c2, v2c3,
+    comment, submitDate, ictRequest
+  ];
+}
+
+// ICT要望サンプル（授業/校務/設定の3カテゴリから1〜4件）
+function generateIctRequestSample_(rand) {
+  var ICT_SAMPLES = [
+    // 授業支援
+    { c: '2年生のロイロノートで提出箱の使い方を教えてほしい',           n: '2年担任 山田',   r: '2年1組' },
+    { c: '英語の授業でGoogle翻訳の効果的な活用方法を相談したい',         n: '英語科 佐藤',     r: '3年A組' },
+    { c: 'プログラミング授業でmicro:bitの設定をサポートしてほしい',      n: '技術科 鈴木',     r: 'PC教室' },
+    { c: '社会科でKahoot!を使ったクイズ形式の授業準備を手伝ってほしい',  n: '社会科 田中',     r: '2年B組' },
+    { c: '美術の授業でiPadのお絵かきアプリの導入を検討したい',           n: '美術科 中村',     r: '美術室' },
+    // 校務支援
+    { c: '成績集計のExcel関数（VLOOKUP）の組み方を教えてほしい',         n: '教頭',            r: '職員室' },
+    { c: '通知表PDFの一括出力の手順を確認したい',                        n: '教務主任 高橋',   r: '事務室' },
+    { c: '出席簿テンプレートのGoogleスプレッドシート化を相談したい',     n: '主任 伊藤',       r: '職員室' },
+    { c: '校務支援システムのログイン不具合を確認してほしい',             n: 'ICT担当 渡辺',    r: '職員室' },
+    { c: '保護者向け一斉連絡ツールの活用方法をレクチャーしてほしい',     n: '副校長',          r: '会議室' },
+    // 設定
+    { c: '新しく届いたタブレットの初期設定をしてほしい',                 n: 'ICT担当 佐藤',    r: 'PC教室' },
+    { c: '教室のプロジェクターHDMI接続を確認してほしい',                 n: '理科 中村',       r: '理科室' },
+    { c: 'Wi-Fi接続が不安定なので調査してほしい',                        n: '情報担当 木村',   r: '体育館' },
+    { c: 'プリンタ設定とドライバインストールをお願いしたい',             n: 'ICT担当 林',      r: '職員室' },
+    { c: '電子黒板とChromebookのミラーリング設定を確認してほしい',       n: 'ICT担当 山口',    r: '1年3組' }
+  ];
+  var n = 1 + Math.floor(rand() * 4); // 1〜4件
+  var copy = ICT_SAMPLES.slice();
+  var items = [];
+  for (var i = 0; i < n && copy.length > 0; i++) {
+    var idx = Math.floor(rand() * copy.length);
+    var it = copy.splice(idx, 1)[0];
+    items.push({ content: it.c, name: it.n, room: it.r });
+  }
+  return JSON.stringify(items);
+}
+
+// 平日リスト取得（祝日を除外）
+function getWeekdaysInMonth_(year, month) {
+  var holidays = ['2026-07-20']; // 海の日（6月は祝日なし、7月は20日）
+  var lastDay = new Date(year, month, 0).getDate();
+  var days = [];
+  for (var d = 1; d <= lastDay; d++) {
+    var date = new Date(year, month - 1, d);
+    var dow = date.getDay();
+    if (dow === 0 || dow === 6) continue;
+    var dateStr = year + '-' + ('0' + month).slice(-2) + '-' + ('0' + d).slice(-2);
+    if (holidays.indexOf(dateStr) >= 0) continue;
+    days.push(dateStr);
+  }
+  return days;
+}
+
+// 候補日3つを重複なくランダムピック
+function pick3Dates_(dates, rand) {
+  var copy = dates.slice();
+  var picks = [];
+  for (var i = 0; i < 3 && copy.length > 0; i++) {
+    var idx = Math.floor(rand() * copy.length);
+    picks.push(copy.splice(idx, 1)[0]);
+  }
+  return picks;
+}
+
+// オンライン時間帯生成（9:00〜16:45の間、1〜3時間、30分刻み）
+function pickOnlineTime_(rand) {
+  var startSlots = ['09:00','09:30','10:00','10:30','11:00','11:30','13:00','13:30','14:00'];
+  var startStr = startSlots[Math.floor(rand() * startSlots.length)];
+  var durationMin = [60, 90, 120, 150, 180][Math.floor(rand() * 5)];
+  var startMin = parseInt(startStr.split(':')[0], 10) * 60 + parseInt(startStr.split(':')[1], 10);
+  var endMin = startMin + durationMin;
+  var maxEnd = 16 * 60 + 45;
+  if (endMin > maxEnd) endMin = maxEnd;
+  if (endMin - startMin < 60) endMin = startMin + 60;
+  var endHour = Math.floor(endMin / 60);
+  var endMinPart = endMin % 60;
+  var endStr = ('0' + endHour).slice(-2) + ':' + ('0' + endMinPart).slice(-2);
+  return startStr + '-' + endStr;
+}
+
+// 重み付き抽選
+function pickWeighted_(weights, randVal) {
+  var total = 0;
+  for (var i = 0; i < weights.length; i++) total += weights[i].w;
+  var r = randVal * total;
+  var acc = 0;
+  for (var i = 0; i < weights.length; i++) {
+    acc += weights[i].w;
+    if (r < acc) return weights[i].v;
+  }
+  return weights[weights.length - 1].v;
+}
+
+// シード付き擬似乱数（LCG）
+function seededRand_(seed) {
+  var s = Math.abs(seed | 0) % 233280;
+  if (s === 0) s = 1;
+  return function() {
+    s = (s * 9301 + 49297) % 233280;
+    return s / 233280;
+  };
+}
+
 // ===== 5月サンプルデータ生成 =====
 
 function setupSampleDataMay2026() {
