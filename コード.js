@@ -23,6 +23,13 @@ function doGet(e) {
   var baseUrl = ScriptApp.getService().getUrl();
   var settings = getSystemSettings_();
 
+  // 教育委員会向け閲覧URL（?role=board&key=...）
+  // 役割判定より先に処理。トークン検証は serveBoard_ 内で実施するので、
+  // 正しいトークンを持っていればSA以外でも閲覧可能。
+  if (params.role === 'board') {
+    return serveBoard_(params, baseUrl);
+  }
+
   // ロール自動判定
   var realRole = detectRole_(realEmail);
 
@@ -32,8 +39,6 @@ function doGet(e) {
     switch (params.role) {
       case 'staff':
         return serveStaff_(impEmail, settings, baseUrl);
-      case 'board':
-        return serveBoard_(params, baseUrl);
       case 'teacher':
         return serveTeacher_(impEmail, settings, baseUrl);
       case 'sa':
