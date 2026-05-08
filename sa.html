@@ -1753,7 +1753,9 @@
 
   // 名前省略
   function shortenSchool(name) {
-    return name.replace('中学校', '');
+    // 学校名はそのまま返す（以前は「中学校」を機械的に除去していたが
+    // 枕崎中学校→枕崎 など地名と紛らわしくなるため廃止）
+    return name;
   }
   function shortenStaff(name) {
     if (!name) return '';

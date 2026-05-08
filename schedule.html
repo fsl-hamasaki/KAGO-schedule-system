@@ -1520,7 +1520,7 @@
           if (isStaffView) {
             var isMySchool = (entry.schoolName === mySchoolName);
             var isSubstitute = entry.origStaff && entry.origStaff !== '' && entry.staffName !== myStaffName;
-            var schoolShort = entry.schoolName.replace('中学校', '');
+            var schoolShort = entry.schoolName;
             var chipBg = isMySchool
               ? (isSubstitute ? 'background:#fff3e0; color:#e65100; font-weight:700;' : 'background:#e8f0fe; color:#1a73e8; font-weight:700;')
               : (isSubstitute ? 'background:#fef7e0; color:#b8860b;' : 'background:#f0f0f0; color:#5f6368;');
@@ -1593,7 +1593,7 @@
           var entry = sMap[ds][j];
           var isMySchool = (entry.schoolName === mySchoolName);
           var isSubstitute = entry.origStaff && entry.origStaff !== '' && entry.staffName !== myStaffName;
-          var schoolShort = entry.schoolName.replace('中学校', '');
+          var schoolShort = entry.schoolName;
           var label, chipBg;
           if (isMySchool) {
             label = schoolShort;

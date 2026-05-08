@@ -393,7 +393,7 @@
       for (var k = 0; k < entries.length; k++) {
         var e = entries[k];
         var colorIdx = staffColorIdx[e.staffName] !== undefined ? staffColorIdx[e.staffName] : 8;
-        var schoolShort = e.schoolName.replace('中学校', '');
+        var schoolShort = e.schoolName;
         var staffShort = (e.staffName || '').split(/[\s　]/)[0];
         html += '<div class="visit v-c' + (colorIdx % 9) + '" title="' + esc(e.schoolName) + ' - ' + esc(e.staffName) + '">' +
           esc(schoolShort) + ' / ' + esc(staffShort) +
@@ -469,7 +469,7 @@
       var entries = entriesByDate[ds] || [];
       for (var k = 0; k < entries.length; k++) {
         var e = entries[k];
-        var schoolShort = e.schoolName.replace('中学校', '');
+        var schoolShort = e.schoolName;
         html += '<div class="school" title="' + esc(e.schoolName) + '">' +
           esc(schoolShort) + '</div>';
       }
