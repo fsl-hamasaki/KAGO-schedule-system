@@ -470,14 +470,14 @@
       '</tr></thead><tbody>';
     for (var i = 0; i < candidates.length; i++) {
       var c = candidates[i];
-      var ict = c.ictRequest && String(c.ictRequest).trim() ? esc(c.ictRequest) : '-';
+      var ict = fmtIctRequest(c.ictRequest);
       html += '<tr>' +
         '<td style="font-weight:600;">' + esc(c.schoolName) + '</td>' +
         '<td>' + esc(c.name) + '</td>' +
         '<td>' + fmtVal(c.v1c1) + '</td><td>' + fmtVal(c.v1c2) + '</td><td>' + fmtVal(c.v1c3) + '</td>' +
         '<td>' + fmtVal(c.v2c1) + '</td><td>' + fmtVal(c.v2c2) + '</td><td>' + fmtVal(c.v2c3) + '</td>' +
         '<td>' + (c.wantThird ? '<span class="tag" style="background:#e8f0fe;color:#1a73e8;">希望</span>' : '-') + '</td>' +
-        '<td style="max-width:280px; font-size:0.8rem; line-height:1.5;">' + ict + '</td>' +
+        '<td style="max-width:340px; font-size:0.8rem; line-height:1.5;">' + ict + '</td>' +
         '<td style="white-space:nowrap;font-size:0.78rem;">' + esc(c.submittedAt) + '</td>' +
         '</tr>';
     }
@@ -492,6 +492,30 @@
     if (p.length === 3) return parseInt(p[1],10) + '/' + parseInt(p[2],10);
     return esc(val);
   }
+
+  // ICT支援要望(JSON文字列)を一覧表示用に整形
+  function fmtIctRequest(raw) {
+    if (!raw || !String(raw).trim()) return '-';
+    var s = String(raw).trim();
+    try {
+      var items = JSON.parse(s);
+      if (!Array.isArray(items) || items.length === 0) return esc(s);
+      var html = '<ol style="margin:0; padding-left:18px;">';
+      for (var i = 0; i < items.length; i++) {
+        var it = items[i] || {};
+        var meta = [];
+        if (it.name) meta.push(esc(it.name));
+        if (it.room) meta.push(esc(it.room));
+        var metaStr = meta.length > 0 ? '<span style="color:#5f6368;font-size:0.78rem;">（' + meta.join(' / ') + '）</span>' : '';
+        html += '<li style="margin-bottom:2px;">' + esc(it.content || '') + ' ' + metaStr + '</li>';
+      }
+      html += '</ol>';
+      return html;
+    } catch (e) {
+      // 旧形式（プレーンテキスト）はそのまま
+      return esc(s);
+    }
+  }
   function formatMonth(ym) { var p=ym.split('-'); return p.length===2 ? p[0]+'年'+parseInt(p[1],10)+'月分' : ym; }
   function showCommentList() {
     var commented = candidates.filter(function(c) { return c.ictRequest && String(c.ictRequest).trim(); });
@@ -503,7 +527,7 @@
       var c = commented[i];
       html += '<tr><td style="font-weight:600;white-space:nowrap;">' + esc(c.schoolName) + '</td>' +
         '<td style="white-space:nowrap;">' + esc(c.name) + '</td>' +
-        '<td>' + esc(c.ictRequest) + '</td></tr>';
+        '<td>' + fmtIctRequest(c.ictRequest) + '</td></tr>';
     }
     html += '</tbody></table>';
     document.getElementById('commentModalBody').innerHTML = html;

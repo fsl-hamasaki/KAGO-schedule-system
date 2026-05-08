@@ -1278,55 +1278,75 @@ function addMakurazakiSchools() {
   return { success: true, message: msg };
 }
 
-// ===== 6月・7月サンプルデータ生成 =====
+// ===== 鹿児島サンプルデータ 共通定数・ヘルパー =====
 
-// メイン関数: 6月+7月のサンプルデータをまとめて投入（既存5月データは保持、追記モード）
-function setupSampleDataJunJul2026() {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
+var KAGO_TEACHER_NAMES_ = [
+  { sn: '田中', fn: '太郎',     rsn: 'tanaka' },
+  { sn: '佐藤', fn: '花子',     rsn: 'sato' },
+  { sn: '鈴木', fn: '一郎',     rsn: 'suzuki' },
+  { sn: '高橋', fn: '美咲',     rsn: 'takahashi' },
+  { sn: '渡辺', fn: '健太',     rsn: 'watanabe' },
+  { sn: '伊藤', fn: '裕子',     rsn: 'ito' },
+  { sn: '山本', fn: '大輔',     rsn: 'yamamoto' },
+  { sn: '中村', fn: 'あゆみ',   rsn: 'nakamura' },
+  { sn: '小林', fn: '翔',       rsn: 'kobayashi' },
+  { sn: '加藤', fn: '真由美',   rsn: 'kato' },
+  { sn: '吉田', fn: '拓也',     rsn: 'yoshida' },
+  { sn: '山田', fn: '恵子',     rsn: 'yamada' },
+  { sn: '松本', fn: '直樹',     rsn: 'matsumoto' },
+  { sn: '井上', fn: '智子',     rsn: 'inoue' },
+  { sn: '木村', fn: '雄一',     rsn: 'kimura' },
+  { sn: '林',   fn: '由美',     rsn: 'hayashi' },
+  { sn: '斎藤', fn: '誠',       rsn: 'saito' },
+  { sn: '清水', fn: '京子',     rsn: 'shimizu' },
+  { sn: '山口', fn: '正',       rsn: 'yamaguchi' },
+  { sn: '森',   fn: '節子',     rsn: 'mori' }
+];
+var KAGO_TEACHER_ROLES_ = ['教頭', 'ICT担当', '情報教育担当', '研究主任'];
 
-  // 1. 学校マスタを読み込み
-  var schoolSheet = ss.getSheetByName(SHEET_SCHOOLS);
-  if (!schoolSheet) return { success: false, message: '学校マスタが見つかりません' };
-  var schoolData = schoolSheet.getDataRange().getValues();
-  var allSchools = [];
-  for (var i = 1; i < schoolData.length; i++) {
-    if (!schoolData[i][0] || !schoolData[i][1]) continue;
-    var category = String(schoolData[i][4] || '通常').trim();
-    allSchools.push({
-      code: String(schoolData[i][0]).trim(),
-      name: String(schoolData[i][1]).trim(),
+var KAGO_STAFF_LIST_ = [
+  { name: '三池 博孝',     email: 'ict0013@kago.ed.jp' },
+  { name: '鈴木 亮',       email: 'ict0004@kago.ed.jp' },
+  { name: '谷口 涼子',     email: 'ict0005@kago.ed.jp' },
+  { name: '橋口 大地',     email: 'ict0006@kago.ed.jp' },
+  { name: '水元 理恵子',   email: 'ict0001@kago.ed.jp' },
+  { name: '村永 浩',       email: 'ict0003@kago.ed.jp' },
+  { name: '谷川 麗華',     email: 'ict0007@kago.ed.jp' },
+  { name: '中根 秀幸',     email: 'ict0009@kago.ed.jp' },
+  { name: '抜迫 大地',     email: 'ict0008@kago.ed.jp' }
+];
+var KAGO_STAFF_OFF_REASONS_ = ['通院', '私用', '研修', '校内研修', '子の学校行事', '出張', '講習会'];
+
+// 月→定例会日付・名称（金曜日に固定）
+var KAGO_MEETINGS_ = {
+  5: { date: '2026-05-15', name: '5月定例会' },
+  6: { date: '2026-06-19', name: '6月定例会' },
+  7: { date: '2026-07-17', name: '7月定例会' }
+};
+
+// 学校マスタを読み込んで利用しやすい配列で返す
+function loadKagoSchools_() {
+  var schoolSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_SCHOOLS);
+  if (!schoolSheet) return null;
+  var data = schoolSheet.getDataRange().getValues();
+  var schools = [];
+  for (var i = 1; i < data.length; i++) {
+    if (!data[i][0] || !data[i][1]) continue;
+    var category = String(data[i][4] || '通常').trim();
+    schools.push({
+      code: String(data[i][0]).trim(),
+      name: String(data[i][1]).trim(),
       category: category,
       isIsland: category === '離島',
       isMakurazaki: category === '市町村'
     });
   }
+  return schools;
+}
 
-  // 2. サンプル教員氏名（romaji付き）
-  var TEACHER_NAMES = [
-    { sn: '田中', fn: '太郎',     rsn: 'tanaka' },
-    { sn: '佐藤', fn: '花子',     rsn: 'sato' },
-    { sn: '鈴木', fn: '一郎',     rsn: 'suzuki' },
-    { sn: '高橋', fn: '美咲',     rsn: 'takahashi' },
-    { sn: '渡辺', fn: '健太',     rsn: 'watanabe' },
-    { sn: '伊藤', fn: '裕子',     rsn: 'ito' },
-    { sn: '山本', fn: '大輔',     rsn: 'yamamoto' },
-    { sn: '中村', fn: 'あゆみ',   rsn: 'nakamura' },
-    { sn: '小林', fn: '翔',       rsn: 'kobayashi' },
-    { sn: '加藤', fn: '真由美',   rsn: 'kato' },
-    { sn: '吉田', fn: '拓也',     rsn: 'yoshida' },
-    { sn: '山田', fn: '恵子',     rsn: 'yamada' },
-    { sn: '松本', fn: '直樹',     rsn: 'matsumoto' },
-    { sn: '井上', fn: '智子',     rsn: 'inoue' },
-    { sn: '木村', fn: '雄一',     rsn: 'kimura' },
-    { sn: '林',   fn: '由美',     rsn: 'hayashi' },
-    { sn: '斎藤', fn: '誠',       rsn: 'saito' },
-    { sn: '清水', fn: '京子',     rsn: 'shimizu' },
-    { sn: '山口', fn: '正',       rsn: 'yamaguchi' },
-    { sn: '森',   fn: '節子',     rsn: 'mori' }
-  ];
-  var ROLES = ['教頭', 'ICT担当', '情報教育担当', '研究主任'];
-
-  // 3. 教員アカウント生成（既存と重複しないものだけ追加）
+// 教員アカウントが無ければ追加（戻り値: 新規追加件数）
+// allSchools の各要素に teacherEmail / teacherName / teacherRole を付与
+function ensureSampleTeacherAccounts_(allSchools) {
   var userSheet = getOrCreateSheet_(SHEET_USERS, ['メールアドレス', '学校名', '氏名', '担当', '登録日時']);
   var existingEmails = {};
   if (userSheet.getLastRow() > 1) {
@@ -1340,29 +1360,93 @@ function setupSampleDataJunJul2026() {
   var newUsers = [];
   for (var i = 0; i < allSchools.length; i++) {
     var school = allSchools[i];
-    var nameInfo = TEACHER_NAMES[i % TEACHER_NAMES.length];
+    var nameInfo = KAGO_TEACHER_NAMES_[i % KAGO_TEACHER_NAMES_.length];
     var email;
     if (school.isMakurazaki) {
-      // 市町村: t + 学校番号 + 苗字頭文字 (例: t1079t@kago.ed.jp)
       email = 't' + school.code + nameInfo.rsn.charAt(0) + '@kago.ed.jp';
     } else {
-      // 県立高校: s-苗字 + 学校番号 (例: s-tanaka1001@kago.ed.jp)
       email = 's-' + nameInfo.rsn + school.code + '@kago.ed.jp';
     }
     school.teacherEmail = email;
     school.teacherName = nameInfo.sn + ' ' + nameInfo.fn;
-    school.teacherRole = ROLES[i % ROLES.length];
+    school.teacherRole = KAGO_TEACHER_ROLES_[i % KAGO_TEACHER_ROLES_.length];
 
     if (!existingEmails[email]) {
-      var regDate = new Date(2026, 4, 10 + (i % 15)); // 5月10〜24日に登録
+      var regDate = new Date(2026, 3, 10 + (i % 15));
       newUsers.push([email, school.name, school.teacherName, school.teacherRole, regDate]);
     }
   }
   if (newUsers.length > 0) {
     userSheet.getRange(userSheet.getLastRow() + 1, 1, newUsers.length, 5).setValues(newUsers);
   }
+  return newUsers.length;
+}
 
-  // 4. 候補日生成（6月+7月）
+// 月次の支援員休日サンプルを投入（重複は自動スキップ、戻り値: 追加件数）
+function setupKagoMonthlyStaffOff_(year, month) {
+  var staffOffSheet = getOrCreateSheet_(SHEET_STAFF_OFF, STAFF_OFF_HEADERS);
+  ensureStaffOffStatusColumns_(staffOffSheet);
+
+  var weekdays = getWeekdaysInMonth_(year, month);
+  if (weekdays.length === 0) return 0;
+
+  // 既存の (日付, 支援員名) を収集
+  var existingKeys = {};
+  if (staffOffSheet.getLastRow() > 1) {
+    var ed = staffOffSheet.getRange(2, 1, staffOffSheet.getLastRow() - 1, 2).getValues();
+    for (var i = 0; i < ed.length; i++) {
+      var d = ed[i][0];
+      var n = String(ed[i][1]).trim();
+      var dStr = d instanceof Date ? Utilities.formatDate(d, 'Asia/Tokyo', 'yyyy-MM-dd') : String(d).trim();
+      existingKeys[dStr + '|' + n] = true;
+    }
+  }
+
+  var added = 0;
+  for (var i = 0; i < KAGO_STAFF_LIST_.length; i++) {
+    var dayIdx = ((i * 3) + (month - 1) * 2 + 1) % weekdays.length;
+    var date = weekdays[dayIdx];
+    var staff = KAGO_STAFF_LIST_[i];
+    if (existingKeys[date + '|' + staff.name]) continue;
+
+    var reason = KAGO_STAFF_OFF_REASONS_[(i + month) % KAGO_STAFF_OFF_REASONS_.length];
+    var status, rejectReason = '';
+    var modIdx = (i + month) % 9;
+    if (modIdx === 7) {
+      status = '申請中';
+    } else if (modIdx === 8) {
+      status = '却下';
+      rejectReason = '同日に他の支援員も希望しているため再調整をお願いします';
+    } else {
+      status = '承認済';
+    }
+
+    var requestedAt = new Date(year, month - 2, 15 + i, 10, i * 5);
+    staffOffSheet.appendRow([date, staff.name, reason, status, rejectReason, staff.email, requestedAt]);
+    added++;
+  }
+  return added;
+}
+
+// 月次の定例会を投入（重複は自動スキップ、戻り値: 追加されたか）
+function setupKagoMonthlyMeeting_(year, month) {
+  var info = KAGO_MEETINGS_[month];
+  if (!info) return false;
+
+  var meetingSheet = getOrCreateSheet_(SHEET_MEETINGS, ['日付', '名称']);
+  var data = meetingSheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    var d = data[i][0];
+    var dStr = d instanceof Date ? Utilities.formatDate(d, 'Asia/Tokyo', 'yyyy-MM-dd') : String(d).trim();
+    if (dStr === info.date) return false;
+  }
+  meetingSheet.appendRow([info.date, info.name]);
+  return true;
+}
+
+// 候補日シートに行を追記（フォーマット適用込み）
+function appendCandidateRows_(rows) {
+  if (!rows || rows.length === 0) return;
   var candHeaders = [
     'メールアドレス', '学校名', '氏名', '対象年月',
     '支援種別', '時間帯',
@@ -1372,7 +1456,26 @@ function setupSampleDataJunJul2026() {
     '備考', '送信日時', 'ICT支援要望'
   ];
   var candSheet = getOrCreateSheet_(SHEET_CANDIDATES, candHeaders);
+  var startRow = candSheet.getLastRow() + 1;
+  var fullRange = candSheet.getRange(startRow, 1, rows.length, candHeaders.length);
+  fullRange.setNumberFormat('@');
+  SpreadsheetApp.flush();
+  fullRange.setValues(rows);
+  candSheet.getRange(startRow, 17, rows.length, 1).setNumberFormat('yyyy/mm/dd hh:mm');
+}
 
+// ===== 6月・7月サンプルデータ生成 =====
+
+// メイン関数: 6月+7月のサンプルデータをまとめて投入（既存データは保持、追記モード）
+function setupSampleDataJunJul2026() {
+  // 1. 学校マスタ読み込み
+  var allSchools = loadKagoSchools_();
+  if (!allSchools) return { success: false, message: '学校マスタが見つかりません' };
+
+  // 2. 教員アカウント生成
+  var newUsersCount = ensureSampleTeacherAccounts_(allSchools);
+
+  // 3. 候補日生成（6月+7月、2か月合計分布で振り分け）
   var weekdaysJun = getWeekdaysInMonth_(2026, 6);
   var weekdaysJul = getWeekdaysInMonth_(2026, 7);
 
@@ -1383,11 +1486,9 @@ function setupSampleDataJunJul2026() {
 
     var junePlan, julyPlan;
     if (school.isMakurazaki) {
-      // 枕崎: 6月・7月どちらも訪問1回必須
       junePlan = { v: 1, o: 0 };
       julyPlan = { v: 1, o: 0 };
     } else {
-      // 県立高校: 2か月合計の訪問・オンライン回数を抽選し、月ごとに分配
       var totalV = pickWeighted_([
         { v: 0, w: 25 }, { v: 1, w: 55 }, { v: 2, w: 18 }, { v: 3, w: 2 }
       ], rand());
@@ -1409,19 +1510,14 @@ function setupSampleDataJunJul2026() {
     var julyRow = buildCandidateRow_(school, '2026-07', julyPlan, weekdaysJul, rand, i + 100);
     if (julyRow) allRows.push(julyRow);
   }
+  appendCandidateRows_(allRows);
 
-  if (allRows.length > 0) {
-    var startRow = candSheet.getLastRow() + 1;
-    // 先に範囲を確保し、対象年月・候補日列を文字列フォーマットに固定
-    var fullRange = candSheet.getRange(startRow, 1, allRows.length, candHeaders.length);
-    fullRange.setNumberFormat('@');  // 全列を一旦文字列扱いに
-    SpreadsheetApp.flush();
-    fullRange.setValues(allRows);
-    // 送信日時（17列目）だけは日付フォーマットに戻す
-    candSheet.getRange(startRow, 17, allRows.length, 1).setNumberFormat('yyyy/mm/dd hh:mm');
-  }
+  // 4. 支援員休日 + 定例会
+  var so6 = setupKagoMonthlyStaffOff_(2026, 6);
+  var so7 = setupKagoMonthlyStaffOff_(2026, 7);
+  var m6  = setupKagoMonthlyMeeting_(2026, 6);
+  var m7  = setupKagoMonthlyMeeting_(2026, 7);
 
-  // 集計
   var juneCount = 0, julyCount = 0;
   for (var i = 0; i < allRows.length; i++) {
     if (allRows[i][3] === '2026-06') juneCount++;
@@ -1430,7 +1526,9 @@ function setupSampleDataJunJul2026() {
 
   return {
     success: true,
-    message: 'サンプルデータ生成完了: 教員追加 ' + newUsers.length + '名、候補日 6月 ' + juneCount + '件 / 7月 ' + julyCount + '件'
+    message: '6月・7月サンプルデータ生成完了: 教員追加' + newUsersCount + '名 / 候補日 6月' + juneCount +
+      '件・7月' + julyCount + '件 / 支援員休日 6月' + so6 + '件・7月' + so7 + '件' +
+      (m6 ? ' / 6月定例会追加' : '') + (m7 ? ' / 7月定例会追加' : '')
   };
 }
 
@@ -1744,258 +1842,60 @@ function repairCandidatesSheetDateColumns() {
   };
 }
 
-// ===== 5月サンプルデータ生成 =====
+// ===== 5月サンプルデータ生成（鹿児島用） =====
 
 function setupSampleDataMay2026() {
-  // --- 1. システム設定 ---
+  // 1. システム設定を5月に
   var settingsSheet = getOrCreateSheet_(SHEET_SETTINGS, ['設定名', '値']);
   var settingsData = settingsSheet.getDataRange().getValues();
   for (var i = 1; i < settingsData.length; i++) {
     var key = String(settingsData[i][0]).trim();
-    if (key === '対象年月') settingsSheet.getRange(i + 1, 2).setNumberFormat('@').setValue('2026-05');
-    if (key === '締切日') settingsSheet.getRange(i + 1, 2).setValue('2026-04-25');
+    if (key === '対象年月')   settingsSheet.getRange(i + 1, 2).setNumberFormat('@').setValue('2026-05');
+    if (key === '締切日')     settingsSheet.getRange(i + 1, 2).setValue('2026-04-25');
     if (key === 'ステータス') settingsSheet.getRange(i + 1, 2).setValue('締切');
   }
 
-  // --- 2. 定例会 ---
-  var meetingSheet = getOrCreateSheet_(SHEET_MEETINGS, ['日付', '名称']);
-  if (meetingSheet.getLastRow() > 1) {
-    meetingSheet.getRange(2, 1, meetingSheet.getLastRow() - 1, 2).clearContent();
-  }
-  meetingSheet.getRange(2, 1, 1, 2).setValues([['2026-05-15', '5月定例会']]);
+  // 2. 学校マスタ読み込み
+  var allSchools = loadKagoSchools_();
+  if (!allSchools) return { success: false, message: '学校マスタが見つかりません。先に setupSchoolMaster を実行してください。' };
 
-  // --- 3. 支援員個別休日（ステータス混在のサンプル） ---
-  var staffOffSheet = getOrCreateSheet_(SHEET_STAFF_OFF, STAFF_OFF_HEADERS);
-  ensureStaffOffStatusColumns_(staffOffSheet);
-  if (staffOffSheet.getLastRow() > 1) {
-    staffOffSheet.getRange(2, 1, staffOffSheet.getLastRow() - 1, STAFF_OFF_HEADERS.length).clearContent();
-  }
-  // [日付, 支援員名, 備考, ステータス, 却下理由, 申請者メール, 申請日時]
-  var staffOffData = [
-    // 承認済（SA直接追加 or 既承認）
-    ['2026-05-12', '仲西 扶由子', '私用',     '承認済', '', '',                          new Date(2026, 3, 18, 10,  0)],
-    ['2026-05-08', '平川 和',     '通院',     '承認済', '', '2011icttea@fuku-c.ed.jp',   new Date(2026, 3, 19,  9, 30)],
-    ['2026-05-14', '舩越 風音',   '私用',     '承認済', '', '',                          new Date(2026, 3, 20, 11,  0)],
-    ['2026-05-13', '友池 はるか', '研修',     '承認済', '', '2014icttea@fuku-c.ed.jp',   new Date(2026, 3, 21,  9, 30)],
-    // 申請中（支援員から提出済み・SA未承認）
-    ['2026-05-21', '藤林 悠人',   '外部研修', '申請中', '', '2001icttea@fuku-c.ed.jp',   new Date(2026, 3, 24, 14,  0)],
-    ['2026-05-18', '木原 あずさ', '校内研修', '申請中', '', '2002icttea@fuku-c.ed.jp',   new Date(2026, 3, 25, 13,  0)],
-    // 却下（理由付き）
-    ['2026-05-25', '日髙 璃衣子', '私用',     '却下',   '同日に他の支援員も希望しているため再調整をお願いします', '2005icttea@fuku-c.ed.jp', new Date(2026, 3, 22, 16,  0)]
-  ];
-  staffOffSheet.getRange(2, 1, staffOffData.length, STAFF_OFF_HEADERS.length).setValues(staffOffData);
+  // 3. 教員アカウント生成（既存はスキップ）
+  var newUsersCount = ensureSampleTeacherAccounts_(allSchools);
 
-  // --- 4. 学校マスタから学校一覧取得 ---
-  var schoolSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_SCHOOLS);
-  if (!schoolSheet) return { success: false, message: '学校マスタが見つかりません。先にsetupSchoolMasterを実行してください。' };
-  var schoolData = schoolSheet.getDataRange().getValues();
-  var allSchools = [];
-  for (var i = 1; i < schoolData.length; i++) {
-    if (!schoolData[i][0]) continue;
-    allSchools.push({
-      code: String(schoolData[i][0]).trim(),
-      name: String(schoolData[i][1]).trim(),
-      staff: String(schoolData[i][2]).trim()
-    });
-  }
-
-  // --- 5. ユーザー登録（先生データ） ---
-  var surnames = ['田中','佐藤','鈴木','高橋','渡辺','伊藤','山本','中村','小林','加��',
-    '吉田','山田','松本','井上','木村','林','斎藤','清水','山口','森',
-    '池田','橋本','阿部','石川','前田','小川','藤田','岡田','後���','長谷川',
-    '村上','近藤','石井','坂本','遠藤','青木','藤井','西村','福田','太田',
-    '三浦','岡本','松田','中川','中野','原田','小野','田村','竹内','金子',
-    '和田','中山','石田','上田','森田','原','柴田','酒井','工藤','横山',
-    '宮崎','宮本','内田','高木','安藤','島田','谷口','大野','高田','丸山'];
-  var firstNames = ['太郎','花子','一郎','美咲','健太','裕子','大輔','あゆみ','翔','真由美',
-    '拓也','恵子','直樹','智子','雄一','由美','誠','久美���','浩二','幸子',
-    '隆','明美','修','京子','正','洋��','豊','節子','博','順子',
-    '勝','和子','実','典子','進','弘子','勉','信子','清','敏子'];
-  var roles = ['教頭','ICT担当','ICT担当','情報教育担当','ICT担当','教頭','情報教育担当','ICT担当'];
-
-  var userSheet = getOrCreateSheet_(SHEET_USERS, ['メールアドレス', '学校名', '氏名', '担当', '登録日時']);
-  if (userSheet.getLastRow() > 1) {
-    userSheet.getRange(2, 1, userSheet.getLastRow() - 1, 5).clearContent();
-  }
-
-  var userRows = [];
+  // 4. 5月分の候補日生成（5月単月の分布。離島=終日固定、本土・市町村=AM/PM、オンラインも含む）
+  var weekdays = getWeekdaysInMonth_(2026, 5);
+  var rows = [];
   for (var i = 0; i < allSchools.length; i++) {
-    var s = allSchools[i];
-    var sn = surnames[i % surnames.length];
-    var fn = firstNames[i % firstNames.length];
-    var email = 't' + s.code + '@fuku-c.ed.jp';
-    var role = roles[i % roles.length];
-    var regDate = new Date(2026, 3, 10 + (i % 15)); // 4月10日〜24日にランダム���録
-    userRows.push([email, s.name, sn + ' ' + fn, role, regDate]);
-    allSchools[i].teacherEmail = email;
-    allSchools[i].teacherName = sn + ' ' + fn;
-  }
-  userSheet.getRange(2, 1, userRows.length, 5).setValues(userRows);
+    var school = allSchools[i];
+    var rand = seededRand_(parseInt(school.code) * 41 + 5);
 
-  // --- 6. 候補日データ ---
-  // 5月の稼働��
-  var earlyDays = ['2026-05-01','2026-05-07','2026-05-08','2026-05-11','2026-05-12',
-    '2026-05-13','2026-05-14','2026-05-18','2026-05-19','2026-05-20'];
-  var lateDays = ['2026-05-11','2026-05-12','2026-05-13','2026-05-14','2026-05-18',
-    '2026-05-19','2026-05-20','2026-05-21','2026-05-22','2026-05-25',
-    '2026-05-26','2026-05-27','2026-05-28','2026-05-29'];
-  var allWorkDays = ['2026-05-01','2026-05-07','2026-05-08','2026-05-11','2026-05-12',
-    '2026-05-13','2026-05-14','2026-05-18','2026-05-19','2026-05-20',
-    '2026-05-21','2026-05-22','2026-05-25','2026-05-26','2026-05-27',
-    '2026-05-28','2026-05-29'];
-
-  var candidateHeaders = [
-    'メールアドレス','学校名','氏名','対象年月',
-    '1回目_第1候補','1回目_第2候補','1回目_第3候補',
-    '2回目_第1候補','2回目_第2候補','2回目_第3候補',
-    '3回目希望','3回目_第1候補','3回目_第2候補','3回目_第3候補',
-    '訪問減対応','備考','送信日時','ICT支援要望'
-  ];
-  var candSheet = getOrCreateSheet_(SHEET_CANDIDATES, candidateHeaders);
-
-  if (candSheet.getLastRow() > 1) {
-    candSheet.getRange(2, 1, candSheet.getLastRow() - 1, candidateHeaders.length).clearContent();
-  }
-
-  // ICT支援要望サンプル（5月：年度始め・新入生対応・年間計画）
-  var ictRequestSamples = [
-    '生徒のChromebookでGoogle Classroomへのログインが不安定な端末があるため、原因確認をお願いします。',
-    '電子黒板とタブレットのミラーリングがうまくいかないので操作方法を教えてほしいです。',
-    'Google Formsを使った定期テストの自動採点設定を一緒に作っていただきたいです。',
-    'プログラミング教育の年間計画について相談したいです。',
-    '校務支援システムへのログイン不具合が複数発生しているので調査をお願いします。',
-    '保護者向け一斉メール配信ツールの活用方法をレクチャーしてほしいです。',
-    '新入生のアカウント発行で一部設定エラーが出ているため確認をお願いします。',
-    '職員室のプリンタとChromebookの印刷設定をお願いします。',
-    'Google Classroomのクラス作成で名簿一括取り込みの方法を教えてください。',
-    'iPadのMDM管理プロファイルが反映されない端末があるので確認をお願いします。',
-    '',
-    '新年度で職員のGoogleドライブ容量が逼迫しているので整理方法を相談したいです。',
-    '電子黒板のWi-Fi接続が不安定なため設定確認をお願いします。',
-    '生徒用タブレットの初期設定をクラス単位で一括できないか相談したいです。',
-    'YouTubeフィルタリング設定で授業に必要な動画が視聴できないため調整をお願いします。',
-    '部活動の動画記録をクラウドで共有する仕組みを整えたいです。'
-  ];
-
-  // ���易乱数（シード的に添字を使う）
-  function pick(arr, seed) { return arr[seed % arr.length]; }
-  function pickN(arr, n, seed) {
-    var copy = arr.slice();
-    var result = [];
-    for (var j = 0; j < n && copy.length > 0; j++) {
-      var idx = (seed + j * 7) % copy.length;
-      result.push(copy.splice(idx, 1)[0]);
-    }
-    return result;
-  }
-
-  var candRows = [];
-  var NO_PREF = '特に指定しない';
-
-  for (var i = 0; i < allSchools.length; i++) {
-    var s = allSchools[i];
-
-    // パターン分け（7校は未提出）
-    if (i % 11 === 10) continue; // 約7校が未提出
-
-    var pattern = i % 8; // 8パターンのバリエーション
-    var v1c1, v1c2, v1c3, v2c1, v2c2, v2c3;
-    var wantThird = 'いいえ';
-    var v3c1 = '', v3c2 = '', v3c3 = '';
-    var reducePolicy = '振替可';
-    var comment = '';
-    var ictRequest = ictRequestSamples[i % ictRequestSamples.length];
-
-    // 1回目候補（通常は前半）
-    var v1picks = pickN(earlyDays, 3, i * 3 + 1);
-
-    // 2回目候補（通常は後半）
-    var v2picks = pickN(lateDays, 3, i * 5 + 2);
-
-    switch (pattern) {
-      case 0: // 全候補指定・標準
-        v1c1 = v1picks[0]; v1c2 = v1picks[1]; v1c3 = v1picks[2];
-        v2c1 = v2picks[0]; v2c2 = v2picks[1]; v2c3 = v2picks[2];
-        break;
-
-      case 1: // 第1候補のみ、残りは「特に指定しない」
-        v1c1 = v1picks[0]; v1c2 = NO_PREF; v1c3 = NO_PREF;
-        v2c1 = v2picks[0]; v2c2 = NO_PREF; v2c3 = NO_PREF;
-        break;
-
-      case 2: // 全候補指定＋3回目希望あり
-        v1c1 = v1picks[0]; v1c2 = v1picks[1]; v1c3 = v1picks[2];
-        v2c1 = v2picks[0]; v2c2 = v2picks[1]; v2c3 = v2picks[2];
-        wantThird = 'はい';
-        var v3picks = pickN(allWorkDays, 3, i * 7 + 3);
-        v3c1 = v3picks[0]; v3c2 = v3picks[1]; v3c3 = v3picks[2];
-        break;
-
-      case 3: // 第1・第2候補のみ
-        v1c1 = v1picks[0]; v1c2 = v1picks[1]; v1c3 = NO_PREF;
-        v2c1 = v2picks[0]; v2c2 = v2picks[1]; v2c3 = NO_PREF;
-        comment = '5月は行事が多いため柔軟に対応します';
-        break;
-
-      case 4: // 全候補指定＋2回必須
-        v1c1 = v1picks[0]; v1c2 = v1picks[1]; v1c3 = v1picks[2];
-        v2c1 = v2picks[0]; v2c2 = v2picks[1]; v2c3 = v2picks[2];
-        reducePolicy = '2回必須';
-        comment = '研究授業の準備があるため2回の訪問を希望します';
-        break;
-
-      case 5: // ルール違反：1回目に下旬を指定
-        var latePicksForV1 = pickN(lateDays, 3, i * 4 + 5);
-        v1c1 = latePicksForV1[0]; v1c2 = latePicksForV1[1]; v1c3 = NO_PREF;
-        v2c1 = v2picks[0]; v2c2 = v2picks[1]; v2c3 = v2picks[2];
-        comment = '月の前半は出張が多いため後半希望です';
-        break;
-
-      case 6: // 全候補指定＋備考あり
-        v1c1 = v1picks[0]; v1c2 = v1picks[1]; v1c3 = v1picks[2];
-        v2c1 = v2picks[0]; v2c2 = v2picks[1]; v2c3 = v2picks[2];
-        comment = '��月に関しては、月の前半部分に2回訪問が希望です';
-        break;
-
-      case 7: // 3回目希望＋備考
-        v1c1 = v1picks[0]; v1c2 = v1picks[1]; v1c3 = v1picks[2];
-        v2c1 = v2picks[0]; v2c2 = v2picks[1]; v2c3 = v2picks[2];
-        wantThird = 'はい';
-        var v3picks2 = pickN(allWorkDays, 3, i * 9 + 1);
-        v3c1 = v3picks2[0]; v3c2 = v3picks2[1]; v3c3 = NO_PREF;
-        comment = 'タブレット導入の相談をしたいです';
-        break;
+    var plan;
+    if (school.isMakurazaki) {
+      plan = { v: 1, o: 0 };
+    } else {
+      // 5月単月分布: 訪問は0/1/2/3を 50/40/8/2、オンラインは0/1/2を 78/20/2
+      var v = pickWeighted_([
+        { v: 0, w: 50 }, { v: 1, w: 40 }, { v: 2, w: 8 }, { v: 3, w: 2 }
+      ], rand());
+      var o = pickWeighted_([
+        { v: 0, w: 78 }, { v: 1, w: 20 }, { v: 2, w: 2 }
+      ], rand());
+      plan = { v: v, o: o };
     }
 
-    // 送信日時（4月15日〜25日にランダム）
-    var submitDate = new Date(2026, 3, 15 + (i % 11), 9 + (i % 8), (i * 7) % 60);
-
-    candRows.push([
-      s.teacherEmail, s.name, s.teacherName, '2026-05',
-      v1c1, v1c2, v1c3, v2c1, v2c2, v2c3,
-      wantThird, v3c1, v3c2, v3c3,
-      reducePolicy, comment, submitDate, ictRequest
-    ]);
+    var row = buildCandidateRow_(school, '2026-05', plan, weekdays, rand, i);
+    if (row) rows.push(row);
   }
+  appendCandidateRows_(rows);
 
-  if (candRows.length > 0) {
-    var candRange = candSheet.getRange(2, 1, candRows.length, candidateHeaders.length);
-    // 対象年月(4列目)と候補日列(5〜14列目)を文字列フォーマットにして日付自動変換を防ぐ
-    candSheet.getRange(2, 4, candRows.length, 11).setNumberFormat('@');
-    candRange.setValues(candRows);
-  }
-
-  // --- 7. 全体休日（GW用、既に祝日はクライアント側にあるが念のためお盆等を登録） ---
-  var holidaySheet = getOrCreateSheet_(SHEET_HOLIDAYS, ['日付', '名称']);
-  if (holidaySheet.getLastRow() > 1) {
-    holidaySheet.getRange(2, 1, holidaySheet.getLastRow() - 1, 2).clearContent();
-  }
-  // 5月は祝日がシ���テム内蔵なので追加の特別休日は不要だが、���として1件
-  holidaySheet.getRange(2, 1, 1, 2).setValues([['2026-05-01', 'GW期間（任意休暇推奨日）']]);
+  // 5. 支援員休日 + 定例会
+  var staffOffAdded = setupKagoMonthlyStaffOff_(2026, 5);
+  var meetingAdded  = setupKagoMonthlyMeeting_(2026, 5);
 
   return {
     success: true,
-    message: 'サンプルデータ生成完了: ユーザ��' + userRows.length + '名、候補日' + candRows.length + '件、支援員休日' + staffOffData.length + '件'
+    message: '5月サンプルデータ生成完了: 教員追加' + newUsersCount + '名 / 候補日' + rows.length +
+      '件 / 支援員休日' + staffOffAdded + '件' + (meetingAdded ? ' / 5月定例会追加' : '')
   };
 }
 
@@ -2514,162 +2414,5 @@ function resetAllData() {
   return { success: true, message: '全データを初期化しました' };
 }
 
-function setupSampleDataJune2026() {
-  // 5月のスケジュールが確定済みであることを前提とする
-  // まず5月実績から優先スコアを更新（既にautoAssignで計算済みのはず）
-
-  // --- 1. システム設定を6月に更新 ---
-  var settingsSheet = getOrCreateSheet_(SHEET_SETTINGS, ['設定名', '値']);
-  var settingsData = settingsSheet.getDataRange().getValues();
-  for (var i = 1; i < settingsData.length; i++) {
-    var key = String(settingsData[i][0]).trim();
-    if (key === '対象年月') settingsSheet.getRange(i + 1, 2).setNumberFormat('@').setValue('2026-06');
-    if (key === '締切日') settingsSheet.getRange(i + 1, 2).setValue('2026-05-25');
-    if (key === 'ステータス') settingsSheet.getRange(i + 1, 2).setValue('締切');
-  }
-
-  // --- 2. 支援員休日（6月分・ステータス混在） ---
-  var staffOffSheet = getOrCreateSheet_(SHEET_STAFF_OFF, STAFF_OFF_HEADERS);
-  ensureStaffOffStatusColumns_(staffOffSheet);
-  // 5月分を残しつつ6月分を追加
-  // [日付, 支援員名, 備考, ステータス, 却下理由, 申請者メール, 申請日時]
-  var staffOffData = [
-    ['2026-06-05', '仲西 扶由子', '私用',     '承認済', '', '',                        new Date(2026, 4, 16, 10,  0)],
-    ['2026-06-10', '舩越 風音',   '通院',     '承認済', '', '2010icttea@fuku-c.ed.jp', new Date(2026, 4, 17,  9, 30)],
-    ['2026-06-19', '木原 あずさ', '校内研修', '承認済', '', '2002icttea@fuku-c.ed.jp', new Date(2026, 4, 18, 14,  0)],
-    // 申請中
-    ['2026-06-23', '藤林 悠人',   '私用',     '申請中', '', '2001icttea@fuku-c.ed.jp', new Date(2026, 4, 22, 11,  0)],
-    ['2026-06-25', '友池 はるか', '私用',     '申請中', '', '2014icttea@fuku-c.ed.jp', new Date(2026, 4, 23, 13, 30)],
-    // 却下
-    ['2026-06-12', '中山 拓也',   '出張',     '却下',   '6月は別予定で稼働日が少ないため再検討をお願いします', '2008icttea@fuku-c.ed.jp', new Date(2026, 4, 20, 15,  0)]
-  ];
-  for (var i = 0; i < staffOffData.length; i++) {
-    staffOffSheet.appendRow(staffOffData[i]);
-  }
-
-  // --- 3. 定例会（6月分） ---
-  var meetingSheet = getOrCreateSheet_(SHEET_MEETINGS, ['日付', '名称']);
-  meetingSheet.appendRow(['2026-06-19', '6月定例会']);
-
-  // --- 4. 候補日データ（6月分） ---
-  var schoolSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_SCHOOLS);
-  var schoolData = schoolSheet.getDataRange().getValues();
-  var allSchools = [];
-  for (var i = 1; i < schoolData.length; i++) {
-    if (!schoolData[i][0]) continue;
-    allSchools.push({ code: String(schoolData[i][0]).trim(), name: String(schoolData[i][1]).trim() });
-  }
-
-  // ユーザーデータから教師メール取得
-  var userSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(SHEET_USERS);
-  var userData = userSheet.getDataRange().getValues();
-  var userMap = {};
-  for (var i = 1; i < userData.length; i++) {
-    userMap[String(userData[i][1]).trim()] = { email: String(userData[i][0]).trim(), name: String(userData[i][2]).trim() };
-  }
-
-  var earlyDays = ['2026-06-01','2026-06-02','2026-06-03','2026-06-04','2026-06-05',
-    '2026-06-08','2026-06-09','2026-06-10','2026-06-11','2026-06-12',
-    '2026-06-15','2026-06-16','2026-06-17','2026-06-18'];
-  var lateDays = ['2026-06-11','2026-06-12','2026-06-15','2026-06-16','2026-06-17',
-    '2026-06-18','2026-06-22','2026-06-23','2026-06-24','2026-06-25',
-    '2026-06-26','2026-06-29','2026-06-30'];
-  var allWorkDays = ['2026-06-01','2026-06-02','2026-06-03','2026-06-04','2026-06-05',
-    '2026-06-08','2026-06-09','2026-06-10','2026-06-11','2026-06-12',
-    '2026-06-15','2026-06-16','2026-06-17','2026-06-18',
-    '2026-06-22','2026-06-23','2026-06-24','2026-06-25',
-    '2026-06-26','2026-06-29','2026-06-30'];
-
-  var candidateHeaders = [
-    'メールアドレス','学校名','氏名','対象年月',
-    '1回目_第1候補','1回目_第2候補','1回目_第3候補',
-    '2回目_第1候補','2回目_第2候補','2回目_第3候補',
-    '3回目希望','3回目_第1候補','3回目_第2候補','3回目_第3候補',
-    '訪問減対応','備考','送信日時','ICT支援要望'
-  ];
-  var candSheet = getOrCreateSheet_(SHEET_CANDIDATES, candidateHeaders);
-
-
-  // ICT支援要望サンプル（6月：水泳指導・期末テスト・研究授業）
-  var ictRequestSamples = [
-    '校内のWi-Fiが特定教室で不安定なので、APの確認と再設定をお願いします。',
-    'Google Driveの共有設定がうまくいっていないので、職員間の共有ルールを整理したいです。',
-    '生徒用アカウントのパスワード再発行を一括で行いたいです。',
-    'ロイロノート・スクールの操作研修を職員向けに実施してもらえると助かります。',
-    '電子黒板の起動が遅い教室があるので、確認をお願いします。',
-    'プリンタへのスキャン送信ができない端末があり、原因調査をお願いします。',
-    '期末テストの分析・集計で使えるGoogleシート関数を教えてほしいです。',
-    '校内ネットワーク経由で動画教材を配信する方法を相談したいです。',
-    '研究授業に向けてGoogle Slidesの共同編集機能の使い方を教えてほしいです。',
-    '校務支援システムから出席簿のExcel出力で文字化けが起きているため対応をお願いします。',
-    '',
-    '体育祭の動画撮影と編集、共有方法について相談したいです。',
-    '保健室のオンライン健康観察フォームの集計方法を整理したいです。',
-    '生徒のChromebookで一部アプリが起動しない問題が出ているので調査をお願いします。',
-    '夏休みに向けたデジタル教材のクラウド整理方法を相談したいです。',
-    'Kahoot!やQuizletを授業で使うための初期設定を相談したいです。'
-  ];
-
-  function pick(arr, seed) { return arr[seed % arr.length]; }
-  function pickN(arr, n, seed) {
-    var copy = arr.slice();
-    var result = [];
-    for (var j = 0; j < n && copy.length > 0; j++) {
-      var idx = (seed + j * 7) % copy.length;
-      result.push(copy.splice(idx, 1)[0]);
-    }
-    return result;
-  }
-
-  var NO_PREF = '特に指定しない';
-  var candRows = [];
-
-  for (var i = 0; i < allSchools.length; i++) {
-    var s = allSchools[i];
-    var user = userMap[s.name];
-    if (!user) continue;
-    if (i % 13 === 12) continue; // 数校は未提出
-
-    var pattern = (i + 3) % 8;
-    var v1picks = pickN(earlyDays, 3, i * 4 + 2);
-    var v2picks = pickN(lateDays, 3, i * 6 + 3);
-    var v1c1, v1c2, v1c3, v2c1, v2c2, v2c3;
-    var wantThird = 'いいえ', v3c1 = '', v3c2 = '', v3c3 = '';
-    var reducePolicy = '振替可', comment = '';
-    var ictRequest = ictRequestSamples[i % ictRequestSamples.length];
-
-    switch (pattern) {
-      case 0: v1c1=v1picks[0]; v1c2=v1picks[1]; v1c3=v1picks[2]; v2c1=v2picks[0]; v2c2=v2picks[1]; v2c3=v2picks[2]; break;
-      case 1: v1c1=v1picks[0]; v1c2=NO_PREF; v1c3=NO_PREF; v2c1=v2picks[0]; v2c2=NO_PREF; v2c3=NO_PREF; break;
-      case 2:
-        v1c1=v1picks[0]; v1c2=v1picks[1]; v1c3=v1picks[2]; v2c1=v2picks[0]; v2c2=v2picks[1]; v2c3=v2picks[2];
-        wantThird='はい'; var v3p=pickN(allWorkDays,3,i*8+4); v3c1=v3p[0]; v3c2=v3p[1]; v3c3=v3p[2]; break;
-      case 3: v1c1=v1picks[0]; v1c2=v1picks[1]; v1c3=NO_PREF; v2c1=v2picks[0]; v2c2=v2picks[1]; v2c3=NO_PREF; comment='期末テスト期間は避けてほしい'; break;
-      case 4: v1c1=v1picks[0]; v1c2=v1picks[1]; v1c3=v1picks[2]; v2c1=v2picks[0]; v2c2=v2picks[1]; v2c3=v2picks[2]; reducePolicy='2回必須'; comment='プログラミング授業の準備で2回必要'; break;
-      case 5:
-        var lp=pickN(lateDays,3,i*5+6); v1c1=lp[0]; v1c2=lp[1]; v1c3=NO_PREF;
-        v2c1=v2picks[0]; v2c2=v2picks[1]; v2c3=v2picks[2]; comment='前半は行事のため後半希望'; break;
-      case 6: v1c1=v1picks[0]; v1c2=v1picks[1]; v1c3=v1picks[2]; v2c1=v2picks[0]; v2c2=v2picks[1]; v2c3=v2picks[2]; comment='6月は水泳指導開始のためICT活用相談希望'; break;
-      case 7:
-        v1c1=v1picks[0]; v1c2=v1picks[1]; v1c3=v1picks[2]; v2c1=v2picks[0]; v2c2=v2picks[1]; v2c3=v2picks[2];
-        wantThird='はい'; var v3p2=pickN(allWorkDays,3,i*10+2); v3c1=v3p2[0]; v3c2=v3p2[1]; v3c3=NO_PREF; comment='研究発表の準備支援希望'; break;
-    }
-
-    var submitDate = new Date(2026, 4, 15 + (i % 10), 10 + (i % 7), (i * 11) % 60);
-    candRows.push([user.email, s.name, user.name, '2026-06',
-      v1c1, v1c2, v1c3, v2c1, v2c2, v2c3, wantThird, v3c1, v3c2, v3c3,
-      reducePolicy, comment, submitDate, ictRequest]);
-  }
-
-  if (candRows.length > 0) {
-    var startRow = candSheet.getLastRow() + 1;
-    candSheet.getRange(startRow, 4, candRows.length, 1).setNumberFormat('@');
-    candSheet.getRange(startRow, 5, candRows.length, 10).setNumberFormat('@');
-    candSheet.getRange(startRow, 1, candRows.length, candidateHeaders.length).setValues(candRows);
-  }
-
-  return {
-    success: true,
-    message: '6月サンプルデータ生成完了: 候補日' + candRows.length + '件。優先スコアは5月の実績が反映されます。'
-  };
-}
+// （旧 setupSampleDataJune2026 [福岡市版] は削除されました。
+//  鹿児島用の 6月+7月 サンプルデータ生成は setupSampleDataJunJul2026() を使用してください）

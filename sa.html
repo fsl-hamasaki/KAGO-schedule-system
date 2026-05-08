@@ -706,11 +706,11 @@
             </div>
             <div style="display:flex; align-items:center; gap:12px;">
               <button class="btn btn-primary" onclick="reviewAction('may')">5月サンプルデータ</button>
-              <span style="font-size:0.82rem; color:#5f6368;">5月分のサンプルデータ（ユーザー・候補日・休日）を生成します</span>
+              <span style="font-size:0.82rem; color:#5f6368;">鹿児島用 5月分（教員アカウント・候補日・支援員休日・定例会）を生成します</span>
             </div>
             <div style="display:flex; align-items:center; gap:12px;">
-              <button class="btn btn-primary" onclick="reviewAction('june')">6月サンプルデータ</button>
-              <span style="font-size:0.82rem; color:#5f6368;">6月分の候補日データを追加します（5月の優先スコアが反映されます）</span>
+              <button class="btn btn-primary" onclick="reviewAction('junjul')">6月・7月サンプルデータ</button>
+              <span style="font-size:0.82rem; color:#5f6368;">鹿児島用 6月+7月分の候補日と支援員休日・定例会を追加します（5月の優先スコアが反映されます）</span>
             </div>
           </div>
           <span class="message" id="reviewMessage" style="margin-top:12px;"></span>
@@ -2079,15 +2079,18 @@
   function reviewAction(action) {
     var msg = document.getElementById('reviewMessage');
     var confirmMsg = action === 'reset' ? '全データを初期化します。よろしいですか？' :
-      action === 'may' ? '5月サンプルデータを生成します。よろしいですか？' :
-      '6月サンプルデータを生成します。よろしいですか？';
+      action === 'may'    ? '5月サンプルデータを生成します。よろしいですか？' :
+      action === 'junjul' ? '6月・7月サンプルデータを生成します。よろしいですか？' :
+      '処理を実行します。よろしいですか？';
     if (!confirm(confirmMsg)) return;
 
     msg.textContent = '処理中...';
     msg.className = 'message success'; msg.style.display = 'block';
 
-    var funcName = action === 'reset' ? 'resetAllData' :
-      action === 'may' ? 'setupSampleDataMay2026' : 'setupSampleDataJune2026';
+    var funcName = action === 'reset'  ? 'resetAllData' :
+      action === 'may'    ? 'setupSampleDataMay2026' :
+      action === 'junjul' ? 'setupSampleDataJunJul2026' :
+      'resetAllData';
 
     google.script.run
       .withSuccessHandler(function(result) {
