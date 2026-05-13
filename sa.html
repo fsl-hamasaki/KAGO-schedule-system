@@ -834,6 +834,10 @@
               <button class="btn btn-primary" onclick="reviewAction('junjul')">6月・7月サンプルデータ</button>
               <span style="font-size:0.82rem; color:#5f6368;">鹿児島用 6月+7月分の候補日と支援員休日・定例会を追加します（5月の優先スコアが反映されます）</span>
             </div>
+            <div style="display:flex; align-items:center; gap:12px; padding-top:8px; border-top:1px dashed #e8eaed; margin-top:4px;">
+              <button class="btn btn-primary" style="background:#0d904f;" onclick="reviewAction('junFull')">6月フルサンプル（要望+自動割当+手入力）</button>
+              <span style="font-size:0.82rem; color:#5f6368;">対象月を2026-06に設定 → 6・7月候補日要望 → 自動割当（仮） → 6月の手入力スケジュールを一括投入します。統合スケジュールの動作確認用</span>
+            </div>
           </div>
           <span class="message" id="reviewMessage" style="margin-top:12px;"></span>
         </div>
@@ -2218,18 +2222,20 @@
 
   function reviewAction(action) {
     var msg = document.getElementById('reviewMessage');
-    var confirmMsg = action === 'reset' ? '全データを初期化します。よろしいですか？' :
-      action === 'may'    ? '5月サンプルデータを生成します。よろしいですか？' :
-      action === 'junjul' ? '6月・7月サンプルデータを生成します。よろしいですか？' :
+    var confirmMsg = action === 'reset'   ? '全データを初期化します。よろしいですか？' :
+      action === 'may'     ? '5月サンプルデータを生成します。よろしいですか？' :
+      action === 'junjul'  ? '6月・7月サンプルデータを生成します。よろしいですか？' :
+      action === 'junFull' ? '6月フルサンプル（対象月設定+要望候補日+自動割当+手入力）を一括投入します。よろしいですか？\n※既存の候補日・スケジュール・手入力データに上書きされる可能性があります。' :
       '処理を実行します。よろしいですか？';
     if (!confirm(confirmMsg)) return;
 
     msg.textContent = '処理中...';
     msg.className = 'message success'; msg.style.display = 'block';
 
-    var funcName = action === 'reset'  ? 'resetAllData' :
-      action === 'may'    ? 'setupSampleDataMay2026' :
-      action === 'junjul' ? 'setupSampleDataJunJul2026' :
+    var funcName = action === 'reset'   ? 'resetAllData' :
+      action === 'may'     ? 'setupSampleDataMay2026' :
+      action === 'junjul'  ? 'setupSampleDataJunJul2026' :
+      action === 'junFull' ? 'setupSampleDataJun2026Full' :
       'resetAllData';
 
     google.script.run
@@ -2237,7 +2243,7 @@
         msg.textContent = result.message;
         msg.className = 'message ' + (result.success ? 'success' : 'error');
         if (result.success) {
-          setTimeout(function() { window.top.location.reload(); }, 1500);
+          setTimeout(function() { window.top.location.reload(); }, 2500);
         }
       })
       .withFailureHandler(function(err) {

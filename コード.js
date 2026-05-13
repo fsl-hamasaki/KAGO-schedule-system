@@ -2834,6 +2834,44 @@ function setupSampleManualSchedule(targetMonth) {
   return { success: true, message: '手入力スケジュール サンプル投入: ' + added + '件（対象月: ' + targetMonth + '）' };
 }
 
+// 6月フルサンプル: 対象月設定 + 候補日要望 + 自動割当 + 手入力スケジュールを一括投入
+function setupSampleDataJun2026Full() {
+  var summary = [];
+
+  // 1. システム設定: 対象年月=2026-06、ステータス=締切
+  var settingsSheet = getOrCreateSheet_(SHEET_SETTINGS, ['設定名', '値']);
+  var data = settingsSheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    var key = String(data[i][0]).trim();
+    if (key === '対象年月')   settingsSheet.getRange(i + 1, 2).setNumberFormat('@').setValue('2026-06');
+    if (key === '締切日')     settingsSheet.getRange(i + 1, 2).setValue('2026-05-25');
+    if (key === 'ステータス') settingsSheet.getRange(i + 1, 2).setValue('締切');
+  }
+  summary.push('対象月=2026-06 ステータス=締切');
+
+  // 2. 6月+7月の候補日要望サンプル
+  var r1 = setupSampleDataJunJul2026();
+  if (!r1 || !r1.success) {
+    return { success: false, message: '候補日サンプル生成に失敗: ' + (r1 && r1.message ? r1.message : '不明') };
+  }
+  summary.push(r1.message);
+
+  // 3. 自動割当（6月）
+  var r2 = null;
+  try {
+    r2 = autoAssignSchedule();
+  } catch (e) {
+    summary.push('自動割当エラー: ' + (e && e.message ? e.message : e));
+  }
+  if (r2) summary.push(r2.success ? r2.message : ('自動割当: ' + r2.message));
+
+  // 4. 6月の手入力スケジュールサンプル
+  var r3 = setupSampleManualSchedule('2026-06');
+  if (r3) summary.push(r3.success ? r3.message : ('手入力: ' + r3.message));
+
+  return { success: true, message: '【6月フルサンプル投入完了】 ' + summary.join(' ／ ') };
+}
+
 // ===== レビュー用機能 =====
 
 function resetAllData() {
