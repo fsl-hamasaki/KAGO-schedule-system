@@ -14,6 +14,7 @@ var SHEET_STAFF_OFF = '支援員休日';
 var SHEET_SCHOOLS = '学校マスタ';
 var SHEET_SCHEDULE = 'スケジュール';
 var SHEET_PRIORITY = '優先スコア';
+var SHEET_MANUAL_SCHEDULE = '手入力スケジュール';
 
 // ===== エントリポイント =====
 
@@ -114,6 +115,14 @@ function serveTeacher_(email, settings, baseUrl) {
   template.staffOff = JSON.stringify(staffOff);
   template.staffName = schoolInfo ? schoolInfo.staffName : '';
   template.supportCategory = schoolInfo ? schoolInfo.supportCategory : '通常';
+  template.municipality = schoolInfo ? schoolInfo.municipality : '鹿児島県';
+  // 自治体スコープの手入力スケジュール（自校分は詳細、他案件は学校名マスクのため municipality 一致を渡す）
+  var myMuni = schoolInfo ? schoolInfo.municipality : '';
+  var myMunicipalityManual = [];
+  if (myMuni) {
+    myMunicipalityManual = getManualSchedules_(null).filter(function(m) { return m.municipality === myMuni; });
+  }
+  template.myMunicipalityManual = JSON.stringify(myMunicipalityManual);
   // 全確定スケジュール（月を絞らない）
   var allConfirmed = getSchedule_(null);
   var confirmedOnly = allConfirmed.filter(function(s) { return s.status === '確定'; });
@@ -157,6 +166,8 @@ function serveSA_(email, settings, baseUrl) {
   template.scheduleData = JSON.stringify(getSchedule_(settings.targetMonth));
   template.priorityScores = JSON.stringify(getPriorityScores_());
   template.accountList = JSON.stringify(getAccountList_());
+  template.manualSchedules = JSON.stringify(getManualSchedules_(settings.targetMonth));
+  template.manualSchools = JSON.stringify(getManualScopedSchools());
   template.baseUrl = baseUrl;
   return template.evaluate()
     .setTitle('SA管理画面 - FSL鹿児島県ICT支援スケジュールシステム')
@@ -177,15 +188,25 @@ function serveStaff_(email, settings, baseUrl) {
   var meetings = getMeetings_();
   var staffOff = getStaffOff_();
 
+  // 手入力スケジュールは全件渡し、画面側で自分の分を編集可・他は閲覧のみとする
+  var allManual = getManualSchedules_(settings.targetMonth);
+  var allManualSchools = getManualScopedSchools();
+  // 自分が担当する手入力校
+  var myStaffName = staffScheduleInfo.staffName;
+  var myManualSchools = allManualSchools.filter(function(s) { return s.staffName === myStaffName; });
+
   var template = HtmlService.createTemplateFromFile('staff');
   template.email = email;
   template.settings = JSON.stringify(settings);
   template.candidates = JSON.stringify(candidates);
   template.mySchedule = JSON.stringify(staffScheduleInfo.schedule);
-  template.myStaffName = staffScheduleInfo.staffName;
+  template.myStaffName = myStaffName;
   template.holidays = JSON.stringify(holidays);
   template.meetings = JSON.stringify(meetings);
   template.staffOff = JSON.stringify(staffOff);
+  template.manualSchedules = JSON.stringify(allManual);
+  template.manualSchools = JSON.stringify(allManualSchools);
+  template.myManualSchools = JSON.stringify(myManualSchools);
   template.baseUrl = baseUrl;
   return template.evaluate()
     .setTitle('支援員画面 - FSL鹿児島県ICT支援スケジュールシステム')
@@ -408,9 +429,12 @@ function submitCandidates(formData) {
     '1回目_第1候補', '1回目_第2候補', '1回目_第3候補',
     '2回目希望', '2回目_支援種別', '2回目_時間帯',
     '2回目_第1候補', '2回目_第2候補', '2回目_第3候補',
-    '備考', '送信日時', 'ICT支援要望'
+    '備考', '送信日時', 'ICT支援要望',
+    '1回目_第2希望時刻', '1回目_第3希望時刻',
+    '2回目_第2希望時刻', '2回目_第3希望時刻'
   ];
   var sheet = getOrCreateSheet_(SHEET_CANDIDATES, headers);
+  ensureCandidateExtraColumns_(sheet);
 
   var data = sheet.getDataRange().getValues();
   var existingRow = -1;
@@ -439,7 +463,11 @@ function submitCandidates(formData) {
     formData.v2c3 || '',
     formData.comment || '',
     new Date(),
-    formData.ictRequest || ''
+    formData.ictRequest || '',
+    formData.timeSlot1_2 || '',
+    formData.timeSlot1_3 || '',
+    formData.timeSlot2_2 || '',
+    formData.timeSlot2_3 || ''
   ];
 
   if (existingRow > 0) {
@@ -474,6 +502,10 @@ function getExistingCandidates_(email, targetMonth) {
         v2c3: normalizeCandidateDate_(data[i][14]),
         comment: String(data[i][15]),
         ictRequest: String(data[i][17] == null ? '' : data[i][17]),
+        timeSlot1_2: String(data[i][18] == null ? '' : data[i][18]),
+        timeSlot1_3: String(data[i][19] == null ? '' : data[i][19]),
+        timeSlot2_2: String(data[i][20] == null ? '' : data[i][20]),
+        timeSlot2_3: String(data[i][21] == null ? '' : data[i][21]),
         submittedAt: data[i][16] instanceof Date
           ? Utilities.formatDate(data[i][16], 'Asia/Tokyo', 'yyyy/MM/dd HH:mm')
           : ''
@@ -532,12 +564,31 @@ function getAllCandidates_(targetMonth) {
       v2c3: normalizeCandidateDate_(data[i][14]),
       comment: String(data[i][15]),
       ictRequest: String(data[i][17] == null ? '' : data[i][17]),
+      timeSlot1_2: String(data[i][18] == null ? '' : data[i][18]),
+      timeSlot1_3: String(data[i][19] == null ? '' : data[i][19]),
+      timeSlot2_2: String(data[i][20] == null ? '' : data[i][20]),
+      timeSlot2_3: String(data[i][21] == null ? '' : data[i][21]),
       submittedAt: data[i][16] instanceof Date
         ? Utilities.formatDate(data[i][16], 'Asia/Tokyo', 'yyyy/MM/dd HH:mm')
         : ''
     });
   }
   return results;
+}
+
+// 既存の候補日シートに新規希望別時刻列が無ければ追加
+function ensureCandidateExtraColumns_(sheet) {
+  var lastCol = sheet.getLastColumn();
+  var existingHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var have = {};
+  for (var i = 0; i < existingHeaders.length; i++) have[String(existingHeaders[i])] = true;
+  var toAdd = [];
+  if (!have['1回目_第2希望時刻']) toAdd.push('1回目_第2希望時刻');
+  if (!have['1回目_第3希望時刻']) toAdd.push('1回目_第3希望時刻');
+  if (!have['2回目_第2希望時刻']) toAdd.push('2回目_第2希望時刻');
+  if (!have['2回目_第3希望時刻']) toAdd.push('2回目_第3希望時刻');
+  if (toAdd.length === 0) return;
+  sheet.getRange(1, lastCol + 1, 1, toAdd.length).setValues([toAdd]);
 }
 
 // ===== WebアプリURL =====
@@ -989,7 +1040,9 @@ function getSchoolByEmail_(email) {
         schoolCode: String(data[i][0]).trim(),
         schoolName: String(data[i][1]).trim(),
         staffName: String(data[i][2]).trim(),
-        staffEmail: String(data[i][3]).trim()
+        staffEmail: String(data[i][3]).trim(),
+        supportCategory: String(data[i][4] || '通常').trim(),
+        municipality: String(data[i][5] || '鹿児島県').trim()
       };
     }
   }
@@ -1008,7 +1061,8 @@ function getSchoolByName_(schoolName) {
         schoolName: String(data[i][1]).trim(),
         staffName: String(data[i][2]).trim(),
         staffEmail: String(data[i][3]).trim(),
-        supportCategory: String(data[i][4] || '通常').trim()
+        supportCategory: String(data[i][4] || '通常').trim(),
+        municipality: String(data[i][5] || '鹿児島県').trim()
       };
     }
   }
@@ -1027,7 +1081,9 @@ function getSchoolsByStaffName_(staffName) {
         schoolCode: String(data[i][0]).trim(),
         schoolName: String(data[i][1]).trim(),
         staffName: String(data[i][2]).trim(),
-        staffEmail: String(data[i][3]).trim()
+        staffEmail: String(data[i][3]).trim(),
+        supportCategory: String(data[i][4] || '通常').trim(),
+        municipality: String(data[i][5] || '鹿児島県').trim()
       });
     }
   }
@@ -1046,7 +1102,9 @@ function getAllSchools_() {
       schoolCode: String(data[i][0]).trim(),
       schoolName: String(data[i][1]).trim(),
       staffName: String(data[i][2]).trim(),
-      staffEmail: String(data[i][3]).trim()
+      staffEmail: String(data[i][3]).trim(),
+      supportCategory: String(data[i][4] || '通常').trim(),
+      municipality: String(data[i][5] || '鹿児島県').trim()
     });
   }
   return results;
@@ -1057,7 +1115,20 @@ function getAllSchools_() {
 function setupMasterSheets() {
   getOrCreateSheet_(SHEET_SA, ['メールアドレス', '氏名']);
   getOrCreateSheet_(SHEET_STAFF, ['メールアドレス', '氏名', '担当エリア']);
-  getOrCreateSheet_(SHEET_SCHOOLS, ['学校番号', '学校名', '担当支援員', '支援員メール', '支援区分']);
+  var schoolSheet = getOrCreateSheet_(SHEET_SCHOOLS, ['学校番号', '学校名', '担当支援員', '支援員メール', '支援区分', '自治体']);
+  ensureSchoolMasterExtraColumns_(schoolSheet);
+}
+
+// 既存学校マスタに「自治体」列が無ければ追加
+function ensureSchoolMasterExtraColumns_(sheet) {
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 1) return;
+  var hdrs = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var has = false;
+  for (var i = 0; i < hdrs.length; i++) if (String(hdrs[i]).trim() === '自治体') { has = true; break; }
+  if (has) return;
+  sheet.getRange(1, lastCol + 1).setValue('自治体')
+    .setFontWeight('bold').setBackground('#1a73e8').setFontColor('#ffffff');
 }
 
 function setupSchoolMaster() {
@@ -1160,16 +1231,33 @@ function setupSchoolMaster() {
     [1086, '立神中学校', '村永 浩', 'ict0003@kago.ed.jp', '市町村']
   ];
 
-  var sheet = getOrCreateSheet_(SHEET_SCHOOLS, ['学校番号', '学校名', '担当支援員', '支援員メール', '支援区分']);
+  // 既存校に自治体を補完（市町村=枕崎市、それ以外=鹿児島県）
+  var schools6 = schools.map(function(s) {
+    var muni = (s[4] === '市町村') ? '枕崎市' : '鹿児島県';
+    return s.concat([muni]);
+  });
+
+  // 手入力カテゴリの追加学校（複数自治体×複数支援員）
+  var manualSchools = [
+    [2001, '鴨池小学校',   '谷川 麗華', 'ict0007@kago.ed.jp', '手入力', '鹿児島市'],
+    [2002, '谷山小学校',   '谷川 麗華', 'ict0007@kago.ed.jp', '手入力', '鹿児島市'],
+    [2003, '武小学校',     '谷川 麗華', 'ict0007@kago.ed.jp', '手入力', '鹿児島市'],
+    [2004, '姶良中学校',   '橋口 大地', 'ict0006@kago.ed.jp', '手入力', '姶良市'],
+    [2005, '帖佐中学校',   '橋口 大地', 'ict0006@kago.ed.jp', '手入力', '姶良市']
+  ];
+  var allSchools = schools6.concat(manualSchools);
+
+  var sheet = getOrCreateSheet_(SHEET_SCHOOLS, ['学校番号', '学校名', '担当支援員', '支援員メール', '支援区分', '自治体']);
+  ensureSchoolMasterExtraColumns_(sheet);
 
   // 既存データがあればクリア（ヘッダー行は残す）
   if (sheet.getLastRow() > 1) {
-    sheet.getRange(2, 1, sheet.getLastRow() - 1, 5).clearContent();
+    sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
   }
 
-  // データ投入
-  if (schools.length > 0) {
-    sheet.getRange(2, 1, schools.length, 5).setValues(schools);
+  // データ投入（6列）
+  if (allSchools.length > 0) {
+    sheet.getRange(2, 1, allSchools.length, 6).setValues(allSchools);
   }
 
   // 支援員マスタも投入
@@ -1355,8 +1443,10 @@ function loadKagoSchools_() {
       code: String(data[i][0]).trim(),
       name: String(data[i][1]).trim(),
       category: category,
+      municipality: String(data[i][5] || '鹿児島県').trim(),
       isIsland: category === '離島',
-      isMakurazaki: category === '市町村'
+      isMakurazaki: category === '市町村',
+      isManual: category === '手入力'
     });
   }
   return schools;
@@ -1471,9 +1561,12 @@ function appendCandidateRows_(rows) {
     '1回目_第1候補', '1回目_第2候補', '1回目_第3候補',
     '2回目希望', '2回目_支援種別', '2回目_時間帯',
     '2回目_第1候補', '2回目_第2候補', '2回目_第3候補',
-    '備考', '送信日時', 'ICT支援要望'
+    '備考', '送信日時', 'ICT支援要望',
+    '1回目_第2希望時刻', '1回目_第3希望時刻',
+    '2回目_第2希望時刻', '2回目_第3希望時刻'
   ];
   var candSheet = getOrCreateSheet_(SHEET_CANDIDATES, candHeaders);
+  ensureCandidateExtraColumns_(candSheet);
   var startRow = candSheet.getLastRow() + 1;
   var fullRange = candSheet.getRange(startRow, 1, rows.length, candHeaders.length);
   fullRange.setNumberFormat('@');
@@ -1500,6 +1593,8 @@ function setupSampleDataJunJul2026() {
   var allRows = [];
   for (var i = 0; i < allSchools.length; i++) {
     var school = allSchools[i];
+    // 手入力カテゴリの学校は候補日を生成しない（SA/支援員が直接スケジュール作成）
+    if (school.isManual) continue;
     var rand = seededRand_(parseInt(school.code) * 31 + 17);
 
     var junePlan, julyPlan;
@@ -1557,6 +1652,8 @@ function buildCandidateRow_(school, targetMonth, plan, weekdays, rand, submitIdx
   var supportType = '', timeSlot = '', v1c1 = '', v1c2 = '', v1c3 = '';
   var wantSecond = false, supportType2 = '', timeSlot2 = '';
   var v2c1 = '', v2c2 = '', v2c3 = '';
+  // 新規: オンライン要望の希望別第2/第3時刻
+  var ts1_2 = '', ts1_3 = '', ts2_2 = '', ts2_3 = '';
   var comment = '';
 
   // 1回目: 訪問優先
@@ -1566,6 +1663,8 @@ function buildCandidateRow_(school, targetMonth, plan, weekdays, rand, submitIdx
   } else {
     supportType = 'オンライン';
     timeSlot = pickOnlineTime_(rand);
+    ts1_2 = pickOnlineTime_(rand);
+    ts1_3 = pickOnlineTime_(rand);
   }
   var p1 = pick3Dates_(weekdays, rand);
   v1c1 = p1[0] || '特に指定しない';
@@ -1589,6 +1688,8 @@ function buildCandidateRow_(school, targetMonth, plan, weekdays, rand, submitIdx
     wantSecond = true;
     supportType2 = 'オンライン';
     timeSlot2 = pickOnlineTime_(rand);
+    ts2_2 = pickOnlineTime_(rand);
+    ts2_3 = pickOnlineTime_(rand);
     var p2 = pick3Dates_(weekdays, rand);
     v2c1 = p2[0] || '特に指定しない';
     v2c2 = p2[1] || '特に指定しない';
@@ -1631,7 +1732,8 @@ function buildCandidateRow_(school, targetMonth, plan, weekdays, rand, submitIdx
     wantSecond ? 'はい' : 'いいえ',
     supportType2, timeSlot2,
     v2c1, v2c2, v2c3,
-    comment, submitDate, ictRequest
+    comment, submitDate, ictRequest,
+    ts1_2, ts1_3, ts2_2, ts2_3
   ];
 }
 
@@ -1885,6 +1987,8 @@ function setupSampleDataMay2026() {
   var rows = [];
   for (var i = 0; i < allSchools.length; i++) {
     var school = allSchools[i];
+    // 手入力カテゴリの学校は候補日を生成しない
+    if (school.isManual) continue;
     var rand = seededRand_(parseInt(school.code) * 41 + 5);
 
     var plan;
@@ -2094,29 +2198,65 @@ function savePriorityScores_(scores) {
 
 // ===== 自動スケジュール割り当て =====
 
-// 支援種別 + 時間帯 から (date, slot) 排他制御用のキーを得る
-function getSlotKey_(supportType, timeSlot) {
-  if (supportType === 'オンライン') return 'ONLINE';
-  if (timeSlot === '09:00-12:00') return 'AM';
-  if (timeSlot === '13:30-16:30') return 'PM';
-  if (timeSlot === '09:00-16:00') return 'FULL';
-  return 'AM';
+// 'HH:MM-HH:MM' 形式の時刻範囲を分単位に分解
+function parseTimeRange_(timeSlot) {
+  var parts = String(timeSlot || '').split('-');
+  if (parts.length !== 2) return null;
+  var s = parts[0].split(':');
+  var e = parts[1].split(':');
+  if (s.length !== 2 || e.length !== 2) return null;
+  var sm = parseInt(s[0], 10) * 60 + parseInt(s[1], 10);
+  var em = parseInt(e[0], 10) * 60 + parseInt(e[1], 10);
+  if (isNaN(sm) || isNaN(em)) return null;
+  return { start: sm, end: em };
 }
 
-// (date, slot) が利用可能か（AM+PM 同日OK、FULL は他をブロック、ONLINE は1日1回）
-function canUseSlot_(usedSlots, date, slot) {
+// 支援種別+時間帯から、排他制御に使う slotInfo を得る
+function getSlotInfo_(supportType, timeSlot) {
+  if (supportType === 'オンライン') {
+    var r = parseTimeRange_(timeSlot);
+    return { type: 'ONLINE', startMin: r ? r.start : 0, endMin: r ? r.end : 0, timeSlot: timeSlot };
+  }
+  if (timeSlot === '09:00-12:00') return { type: 'AM' };
+  if (timeSlot === '13:30-16:30') return { type: 'PM' };
+  if (timeSlot === '09:00-16:00') return { type: 'FULL' };
+  return { type: 'AM' };
+}
+
+// 後方互換: 旧 getSlotKey_ 呼び出し用（type のみを返す）
+function getSlotKey_(supportType, timeSlot) {
+  return getSlotInfo_(supportType, timeSlot).type;
+}
+
+// (date, slotInfo) が利用可能か
+//  AM+PM 同日OK / FULL は他をブロック / ONLINE は時刻が重ならなければ同日複数OK
+function canUseSlot_(usedSlots, date, slotInfo) {
   if (!usedSlots[date]) return true;
   var u = usedSlots[date];
-  if (slot === 'FULL')   return !(u.AM || u.PM || u.FULL || u.ONLINE);
-  if (slot === 'AM')     return !(u.AM || u.FULL);
-  if (slot === 'PM')     return !(u.PM || u.FULL);
-  if (slot === 'ONLINE') return !(u.FULL || u.ONLINE);
+  if (slotInfo.type === 'FULL') return !(u.AM || u.PM || u.FULL || (u.online && u.online.length > 0));
+  if (slotInfo.type === 'AM')   return !(u.AM || u.FULL);
+  if (slotInfo.type === 'PM')   return !(u.PM || u.FULL);
+  if (slotInfo.type === 'ONLINE') {
+    if (u.FULL) return false;
+    var ranges = u.online || [];
+    for (var i = 0; i < ranges.length; i++) {
+      // [s,e) ベースで重なり判定
+      if (slotInfo.startMin < ranges[i].end && slotInfo.endMin > ranges[i].start) return false;
+    }
+    return true;
+  }
   return true;
 }
 
-function markSlotUsed_(usedSlots, date, slot) {
+function markSlotUsed_(usedSlots, date, slotInfo) {
   if (!usedSlots[date]) usedSlots[date] = {};
-  usedSlots[date][slot] = true;
+  var u = usedSlots[date];
+  if (slotInfo.type === 'AM' || slotInfo.type === 'PM' || slotInfo.type === 'FULL') {
+    u[slotInfo.type] = true;
+  } else if (slotInfo.type === 'ONLINE') {
+    if (!u.online) u.online = [];
+    u.online.push({ start: slotInfo.startMin, end: slotInfo.endMin });
+  }
 }
 
 // スケジュールシートに「時間帯」「支援種別」列が無ければ追加
@@ -2203,38 +2343,62 @@ function autoAssignSchedule() {
   // --- 4. 候補日を Visit 単位のリクエストに分解（オンライン要望は SA 担当に振り分け） ---
   var ONLINE_SA_STAFF = '山崎 混平'; // オンライン支援を一括担当するSA
 
+  // (rawDates, rawSlots, supportType) から候補ペアの配列を構築
+  function buildCandidatePairs_(rawDates, rawSlots, supportType) {
+    var pairs = [];
+    for (var i = 0; i < rawDates.length; i++) {
+      var d = rawDates[i];
+      if (!d || d === '特に指定しない' || d === 'undefined') continue;
+      var ts = rawSlots[i] || '';
+      pairs.push({
+        date: d,
+        timeSlot: ts,
+        slotInfo: getSlotInfo_(supportType, ts)
+      });
+    }
+    return pairs;
+  }
+
   var allRequests = [];
   for (var i = 0; i < candidates.length; i++) {
     var c = candidates[i];
     var schoolStaff = schoolStaffMap[c.schoolName];
     if (!schoolStaff) continue;
 
-    var v1 = [c.v1c1, c.v1c2, c.v1c3].filter(function(v) { return v && v !== '特に指定しない' && v !== 'undefined'; });
-    var v2 = c.wantSecond ? [c.v2c1, c.v2c2, c.v2c3].filter(function(v) { return v && v !== '特に指定しない' && v !== 'undefined'; }) : [];
-
-    // 1回目
-    var v1Staff = (c.supportType === 'オンライン') ? ONLINE_SA_STAFF : schoolStaff;
+    // 1回目: 時刻は訪問なら全候補共通、オンラインなら候補ごと
+    var stype1 = c.supportType || '訪問';
+    var v1Slots = (stype1 === 'オンライン')
+      ? [c.timeSlot || '', c.timeSlot1_2 || c.timeSlot || '', c.timeSlot1_3 || c.timeSlot || '']
+      : [c.timeSlot || '', c.timeSlot || '', c.timeSlot || ''];
+    var v1Pairs = buildCandidatePairs_([c.v1c1, c.v1c2, c.v1c3], v1Slots, stype1);
+    var v1Staff = (stype1 === 'オンライン') ? ONLINE_SA_STAFF : schoolStaff;
     allRequests.push({
       schoolName: c.schoolName,
       visitNum: 1,
-      candidates: v1,
-      supportType: c.supportType || '訪問',
-      timeSlot: c.timeSlot || '',
-      slotKey: getSlotKey_(c.supportType, c.timeSlot),
+      pairs: v1Pairs,
+      supportType: stype1,
+      // フォールバック検索用（第1希望の slotInfo / timeSlot を使用）
+      fallbackSlotInfo: getSlotInfo_(stype1, v1Slots[0]),
+      fallbackTimeSlot: v1Slots[0],
       staff: v1Staff,
       priority: priorityScores[c.schoolName] || 0
     });
 
     // 2回目（希望校のみ）
     if (c.wantSecond) {
-      var v2Staff = (c.supportType2 === 'オンライン') ? ONLINE_SA_STAFF : schoolStaff;
+      var stype2 = c.supportType2 || '訪問';
+      var v2Slots = (stype2 === 'オンライン')
+        ? [c.timeSlot2 || '', c.timeSlot2_2 || c.timeSlot2 || '', c.timeSlot2_3 || c.timeSlot2 || '']
+        : [c.timeSlot2 || '', c.timeSlot2 || '', c.timeSlot2 || ''];
+      var v2Pairs = buildCandidatePairs_([c.v2c1, c.v2c2, c.v2c3], v2Slots, stype2);
+      var v2Staff = (stype2 === 'オンライン') ? ONLINE_SA_STAFF : schoolStaff;
       allRequests.push({
         schoolName: c.schoolName,
         visitNum: 2,
-        candidates: v2,
-        supportType: c.supportType2 || '訪問',
-        timeSlot: c.timeSlot2 || '',
-        slotKey: getSlotKey_(c.supportType2, c.timeSlot2),
+        pairs: v2Pairs,
+        supportType: stype2,
+        fallbackSlotInfo: getSlotInfo_(stype2, v2Slots[0]),
+        fallbackTimeSlot: v2Slots[0],
         staff: v2Staff,
         priority: priorityScores[c.schoolName] || 0
       });
@@ -2268,25 +2432,25 @@ function autoAssignSchedule() {
     var env = getStaffEnv(req.staff);
     var assigned = null;
 
-    // 第1〜第3候補を順に試す
-    for (var ci = 0; ci < req.candidates.length; ci++) {
-      var date = req.candidates[ci];
-      if (env.work.indexOf(date) !== -1 && canUseSlot_(env.used, date, req.slotKey) &&
-          (!requireDistanceFrom || dayDiff(requireDistanceFrom, date) >= minDistance)) {
-        markSlotUsed_(env.used, date, req.slotKey);
-        assigned = { date: date, rank: '第' + (ci + 1) + '候補' };
+    // 第1〜第3候補を順に試す（候補ごとに対応する slotInfo / timeSlot を使う）
+    for (var ci = 0; ci < req.pairs.length; ci++) {
+      var p = req.pairs[ci];
+      if (env.work.indexOf(p.date) !== -1 && canUseSlot_(env.used, p.date, p.slotInfo) &&
+          (!requireDistanceFrom || dayDiff(requireDistanceFrom, p.date) >= minDistance)) {
+        markSlotUsed_(env.used, p.date, p.slotInfo);
+        assigned = { date: p.date, rank: '第' + (ci + 1) + '候補', timeSlot: p.timeSlot };
         break;
       }
     }
 
-    // 候補外でも空きを探す（規定間隔）
+    // 候補外でも空きを探す（規定間隔、フォールバック slotInfo を使用）
     if (!assigned) {
       for (var wi = 0; wi < env.work.length; wi++) {
         var wd = env.work[wi];
-        if (canUseSlot_(env.used, wd, req.slotKey) &&
+        if (canUseSlot_(env.used, wd, req.fallbackSlotInfo) &&
             (!requireDistanceFrom || dayDiff(requireDistanceFrom, wd) >= minDistance)) {
-          markSlotUsed_(env.used, wd, req.slotKey);
-          assigned = { date: wd, rank: '自動割当' };
+          markSlotUsed_(env.used, wd, req.fallbackSlotInfo);
+          assigned = { date: wd, rank: '自動割当', timeSlot: req.fallbackTimeSlot };
           newPriorityScores[req.schoolName] = (newPriorityScores[req.schoolName] || 0) + 2;
           break;
         }
@@ -2297,17 +2461,17 @@ function autoAssignSchedule() {
     if (!assigned && requireDistanceFrom && fallbackDistance && fallbackDistance < minDistance) {
       for (var wi = 0; wi < env.work.length; wi++) {
         var wd = env.work[wi];
-        if (canUseSlot_(env.used, wd, req.slotKey) &&
+        if (canUseSlot_(env.used, wd, req.fallbackSlotInfo) &&
             dayDiff(requireDistanceFrom, wd) >= fallbackDistance) {
-          markSlotUsed_(env.used, wd, req.slotKey);
-          assigned = { date: wd, rank: '自動割当(間隔短)' };
+          markSlotUsed_(env.used, wd, req.fallbackSlotInfo);
+          assigned = { date: wd, rank: '自動割当(間隔短)', timeSlot: req.fallbackTimeSlot };
           break;
         }
       }
     }
 
     if (!assigned) {
-      assigned = { date: '', rank: '割当不可' };
+      assigned = { date: '', rank: '割当不可', timeSlot: req.fallbackTimeSlot };
     }
     return assigned;
   }
@@ -2324,7 +2488,7 @@ function autoAssignSchedule() {
     if (!assignmentsBySchool[req.schoolName]) assignmentsBySchool[req.schoolName] = [];
     assignmentsBySchool[req.schoolName].push({
       visitNum: 1, date: result.date, rank: result.rank,
-      staff: req.staff, supportType: req.supportType, timeSlot: req.timeSlot
+      staff: req.staff, supportType: req.supportType, timeSlot: result.timeSlot
     });
 
     if (result.rank.indexOf('第1') === -1 && result.rank !== '割当不可' && result.rank.indexOf('自動割当') === -1) {
@@ -2344,7 +2508,7 @@ function autoAssignSchedule() {
     if (!assignmentsBySchool[req.schoolName]) assignmentsBySchool[req.schoolName] = [];
     assignmentsBySchool[req.schoolName].push({
       visitNum: 2, date: result.date, rank: result.rank,
-      staff: req.staff, supportType: req.supportType, timeSlot: req.timeSlot
+      staff: req.staff, supportType: req.supportType, timeSlot: result.timeSlot
     });
 
     if (result.rank.indexOf('第1') === -1 && result.rank !== '割当不可' && result.rank.indexOf('自動割当') === -1) {
@@ -2406,12 +2570,160 @@ function autoAssignSchedule() {
   };
 }
 
+// ===== 手入力スケジュール（要望取得を行わない自治体向け） =====
+
+var MANUAL_SCHED_HEADERS = ['ID', '対象年月', '日付', '支援員名', '学校名', '時間帯', '支援種別', 'ステータス', '自治体', '更新日時'];
+
+function getOrCreateManualScheduleSheet_() {
+  return getOrCreateSheet_(SHEET_MANUAL_SCHEDULE, MANUAL_SCHED_HEADERS);
+}
+
+// 対象月の手入力スケジュールを取得
+function getManualSchedules_(targetMonth) {
+  var sheet = getOrCreateManualScheduleSheet_();
+  var data = sheet.getDataRange().getValues();
+  var results = [];
+  for (var i = 1; i < data.length; i++) {
+    var m = normalizeTargetMonth_(data[i][1]);
+    if (targetMonth && m !== targetMonth) continue;
+    if (!data[i][0]) continue;
+    results.push({
+      id:           String(data[i][0]).trim(),
+      targetMonth:  m,
+      date:         normalizeCandidateDate_(data[i][2]),
+      staffName:    String(data[i][3]).trim(),
+      schoolName:   String(data[i][4]).trim(),
+      timeSlot:     String(data[i][5]).trim(),
+      supportType:  String(data[i][6]).trim(),
+      status:       String(data[i][7] || '仮').trim(),
+      municipality: String(data[i][8] || '').trim(),
+      updatedAt:    data[i][9] instanceof Date
+        ? Utilities.formatDate(data[i][9], 'Asia/Tokyo', 'yyyy/MM/dd HH:mm')
+        : String(data[i][9] || '')
+    });
+  }
+  return results;
+}
+
+// クライアント呼出用ラッパ
+function getManualSchedules(targetMonth) {
+  return getManualSchedules_(targetMonth);
+}
+
+// 自治体マスタ的に、学校マスタから「手入力」カテゴリの学校だけを返す
+function getManualScopedSchools() {
+  var all = getAllSchools_();
+  return all.filter(function(s) { return s.supportCategory === '手入力'; });
+}
+
+// 1件追加
+function addManualSchedule(entry) {
+  if (!entry || !entry.date || !entry.staffName || !entry.schoolName) {
+    return { success: false, message: '日付・支援員・学校は必須です' };
+  }
+  var sheet = getOrCreateManualScheduleSheet_();
+  var id = Utilities.getUuid();
+  var school = getSchoolByName_(entry.schoolName);
+  var municipality = entry.municipality || (school ? school.municipality : '');
+  var row = [
+    id,
+    entry.targetMonth || '',
+    entry.date,
+    entry.staffName,
+    entry.schoolName,
+    entry.timeSlot || '',
+    entry.supportType || '訪問',
+    entry.status || '仮',
+    municipality,
+    new Date()
+  ];
+  var nextRow = sheet.getLastRow() + 1;
+  sheet.getRange(nextRow, 1, 1, row.length).setNumberFormat('@').setValues([row]);
+  sheet.getRange(nextRow, 10).setNumberFormat('yyyy/mm/dd hh:mm');
+  return { success: true, id: id };
+}
+
+// 1件更新
+function updateManualSchedule(id, entry) {
+  if (!id) return { success: false, message: 'IDが指定されていません' };
+  var sheet = getOrCreateManualScheduleSheet_();
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === id) {
+      var rowNum = i + 1;
+      if (entry.date != null)        sheet.getRange(rowNum, 3).setValue(entry.date);
+      if (entry.staffName != null)   sheet.getRange(rowNum, 4).setValue(entry.staffName);
+      if (entry.schoolName != null)  sheet.getRange(rowNum, 5).setValue(entry.schoolName);
+      if (entry.timeSlot != null)    sheet.getRange(rowNum, 6).setValue(entry.timeSlot);
+      if (entry.supportType != null) sheet.getRange(rowNum, 7).setValue(entry.supportType);
+      if (entry.status != null)      sheet.getRange(rowNum, 8).setValue(entry.status);
+      if (entry.municipality != null) sheet.getRange(rowNum, 9).setValue(entry.municipality);
+      sheet.getRange(rowNum, 10).setValue(new Date());
+      return { success: true };
+    }
+  }
+  return { success: false, message: '該当エントリが見つかりません' };
+}
+
+// 1件削除
+function deleteManualSchedule(id) {
+  if (!id) return { success: false, message: 'IDが指定されていません' };
+  var sheet = getOrCreateManualScheduleSheet_();
+  var data = sheet.getDataRange().getValues();
+  for (var i = data.length - 1; i >= 1; i--) {
+    if (String(data[i][0]).trim() === id) {
+      sheet.deleteRow(i + 1);
+      return { success: true };
+    }
+  }
+  return { success: false, message: '該当エントリが見つかりません' };
+}
+
+// 手入力スケジュールのサンプルデータ生成（対象月の翌月用にN件追加）
+function setupSampleManualSchedule(targetMonth) {
+  if (!targetMonth) {
+    var settings = getSystemSettings_();
+    targetMonth = settings.targetMonth || '2026-06';
+  }
+  var schools = getManualScopedSchools();
+  if (schools.length === 0) return { success: false, message: '手入力カテゴリの学校がありません' };
+
+  var parts = targetMonth.split('-');
+  var year = parseInt(parts[0], 10);
+  var month = parseInt(parts[1], 10);
+  var weekdays = getWeekdaysInMonth_(year, month);
+  if (weekdays.length === 0) return { success: false, message: '対象月の平日がありません' };
+
+  var sheet = getOrCreateManualScheduleSheet_();
+  var added = 0;
+  for (var i = 0; i < schools.length; i++) {
+    var sch = schools[i];
+    var rand = seededRand_(parseInt(sch.schoolCode) * 13 + 7);
+    // 各校2件
+    var picked = pick3Dates_(weekdays, rand);
+    var slots = ['09:00-12:00', '13:30-16:30'];
+    for (var k = 0; k < 2; k++) {
+      var d = picked[k];
+      if (!d) continue;
+      var row = [
+        Utilities.getUuid(), targetMonth, d, sch.staffName, sch.schoolName,
+        slots[k % 2], '訪問', '仮', sch.municipality, new Date()
+      ];
+      var nextRow = sheet.getLastRow() + 1;
+      sheet.getRange(nextRow, 1, 1, row.length).setNumberFormat('@').setValues([row]);
+      sheet.getRange(nextRow, 10).setNumberFormat('yyyy/mm/dd hh:mm');
+      added++;
+    }
+  }
+  return { success: true, message: '手入力スケジュール サンプル投入: ' + added + '件（対象月: ' + targetMonth + '）' };
+}
+
 // ===== レビュー用機能 =====
 
 function resetAllData() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheetNames = [SHEET_USERS, SHEET_CANDIDATES, SHEET_SCHEDULE, SHEET_PRIORITY,
-                    SHEET_HOLIDAYS, SHEET_MEETINGS, SHEET_STAFF_OFF];
+                    SHEET_HOLIDAYS, SHEET_MEETINGS, SHEET_STAFF_OFF, SHEET_MANUAL_SCHEDULE];
   for (var i = 0; i < sheetNames.length; i++) {
     var sheet = ss.getSheetByName(sheetNames[i]);
     if (sheet && sheet.getLastRow() > 1) {

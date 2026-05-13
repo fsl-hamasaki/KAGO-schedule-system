@@ -97,6 +97,13 @@
   .info-box { background: #fff8e1; border: 1px solid #ffe082; border-radius: 8px; padding: 14px 18px; font-size: 0.85rem; color: #f57f17; margin-bottom: 20px; }
   .footer { text-align: center; padding: 20px; font-size: 0.78rem; color: #9aa0a6; }
 
+  /* タブバー */
+  .staff-tabbar { display:flex; gap:4px; margin-bottom:18px; border-bottom:2px solid #e8eaed; }
+  .staff-tabbar a { padding:10px 18px; font-size:0.88rem; font-weight:600; color:#5f6368; cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-2px; }
+  .staff-tabbar a.active { color:#e8710a; border-bottom-color:#e8710a; }
+  .staff-tab-content { display:none; }
+  .staff-tab-content.active { display:block; }
+
   @media (max-width: 700px) { .stats-row { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -114,45 +121,121 @@
     <h2 class="page-title" id="staffTitle">訪問スケジュール</h2>
     <p class="page-subtitle" id="pageSubtitle"></p>
 
-    <div class="stats-row" id="statsRow"></div>
-
-    <!-- Calendar -->
-    <div class="card">
-      <div class="cal-nav">
-        <button class="cal-nav-btn" onclick="changeMonth(-1)">&#9664;</button>
-        <span class="cal-title" id="calTitle"></span>
-        <button class="cal-nav-btn" onclick="changeMonth(1)">&#9654;</button>
-      </div>
-      <div id="calArea"></div>
+    <!-- タブバー -->
+    <div class="staff-tabbar">
+      <a class="active" id="staffTabLink-main" onclick="staffTab('main')">要望スケジュール</a>
+      <a id="staffTabLink-manual" onclick="staffTab('manual')">手入力スケジュール</a>
     </div>
 
-    <!-- Leave Request -->
-    <div class="card">
-      <div class="card-title">休み申請</div>
-      <p style="font-size:0.85rem; color:#5f6368; margin-bottom:14px;">
-        休みたい日付を申請してください。SAの承認後、カレンダー・自動割当に反映されます。
+    <!-- 要望スケジュール（既存） -->
+    <div class="staff-tab-content active" id="staffTab-main">
+      <div class="stats-row" id="statsRow"></div>
+
+      <!-- Calendar -->
+      <div class="card">
+        <div class="cal-nav">
+          <button class="cal-nav-btn" onclick="changeMonth(-1)">&#9664;</button>
+          <span class="cal-title" id="calTitle"></span>
+          <button class="cal-nav-btn" onclick="changeMonth(1)">&#9654;</button>
+        </div>
+        <div id="calArea"></div>
+      </div>
+
+      <!-- Leave Request -->
+      <div class="card">
+        <div class="card-title">休み申請</div>
+        <p style="font-size:0.85rem; color:#5f6368; margin-bottom:14px;">
+          休みたい日付を申請してください。SAの承認後、カレンダー・自動割当に反映されます。
+        </p>
+        <div class="leave-form-row">
+          <div>
+            <label class="leave-label">日付</label>
+            <input type="date" id="leaveDate" class="leave-input">
+          </div>
+          <div style="flex:1; min-width:200px;">
+            <label class="leave-label">備考（任意）</label>
+            <input type="text" id="leaveNote" class="leave-input" placeholder="例：研修参加" style="width:100%;">
+          </div>
+          <button class="btn btn-primary" id="submitLeaveBtn" onclick="submitLeaveRequest()">申請する</button>
+        </div>
+        <div id="leaveMessage" style="margin-bottom:10px;"></div>
+
+        <h4 style="font-size:0.9rem; font-weight:700; color:#202124; margin:18px 0 10px;">あなたの申請履歴</h4>
+        <div id="myLeaveList"></div>
+      </div>
+
+      <!-- Candidates Table -->
+      <div class="card">
+        <div class="card-title">入力済み候補日一覧</div>
+        <div id="candidatesArea"></div>
+      </div>
+    </div>
+
+    <!-- 手入力スケジュール -->
+    <div class="staff-tab-content" id="staffTab-manual">
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+        <button class="cal-nav-btn" onclick="changeManualMonth(-1)">&#9664; 前月</button>
+        <span id="manualMonthLabel" style="font-size:1.05rem; font-weight:700; min-width:120px; text-align:center;"></span>
+        <button class="cal-nav-btn" onclick="changeManualMonth(1)">翌月 &#9654;</button>
+        <span id="manualMsg" style="margin:0;"></span>
+      </div>
+      <p style="font-size:0.82rem; color:#5f6368; margin-bottom:14px;">
+        担当する手入力カテゴリの学校（左サイドバー）をカレンダーにドラッグして、翌月の支援予定を組みます。
+        他の支援員の予定は閲覧のみ可能です。
       </p>
-      <div class="leave-form-row">
-        <div>
-          <label class="leave-label">日付</label>
-          <input type="date" id="leaveDate" class="leave-input">
+
+      <div style="display:flex; gap:14px; align-items:flex-start;">
+        <div id="manualSchoolPane" style="width:240px; flex-shrink:0; background:#fff; border-radius:8px; padding:12px; box-shadow:0 1px 3px rgba(0,0,0,0.08); max-height:70vh; overflow-y:auto;"></div>
+        <div style="flex:1; background:#fff; border-radius:8px; padding:12px; box-shadow:0 1px 3px rgba(0,0,0,0.08); overflow-x:auto;">
+          <div id="manualCalendar"></div>
         </div>
-        <div style="flex:1; min-width:200px;">
-          <label class="leave-label">備考（任意）</label>
-          <input type="text" id="leaveNote" class="leave-input" placeholder="例：研修参加" style="width:100%;">
-        </div>
-        <button class="btn btn-primary" id="submitLeaveBtn" onclick="submitLeaveRequest()">申請する</button>
       </div>
-      <div id="leaveMessage" style="margin-bottom:10px;"></div>
 
-      <h4 style="font-size:0.9rem; font-weight:700; color:#202124; margin:18px 0 10px;">あなたの申請履歴</h4>
-      <div id="myLeaveList"></div>
-    </div>
-
-    <!-- Candidates Table -->
-    <div class="card">
-      <div class="card-title">入力済み候補日一覧</div>
-      <div id="candidatesArea"></div>
+      <!-- 編集ダイアログ -->
+      <div id="manualEditDialog" style="display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.4); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:#fff; border-radius:12px; padding:22px 24px; width:360px; max-width:90vw;">
+          <div style="font-size:1.05rem; font-weight:700; margin-bottom:14px;" id="manualDialogTitle">手入力予定</div>
+          <div style="margin-bottom:10px;">
+            <div style="font-size:0.78rem; color:#5f6368; margin-bottom:3px;">学校</div>
+            <div id="manualDialogSchool" style="padding:6px 8px; background:#f6f7f9; border-radius:6px; font-size:0.9rem;"></div>
+          </div>
+          <div style="margin-bottom:10px;">
+            <div style="font-size:0.78rem; color:#5f6368; margin-bottom:3px;">支援員</div>
+            <div id="manualDialogStaff" style="padding:6px 8px; background:#f6f7f9; border-radius:6px; font-size:0.9rem;"></div>
+          </div>
+          <div style="margin-bottom:10px;">
+            <div style="font-size:0.78rem; color:#5f6368; margin-bottom:3px;">日付</div>
+            <input type="date" id="manualDialogDate" style="width:100%; padding:6px 8px; border:1.5px solid #dadce0; border-radius:6px;">
+          </div>
+          <div style="margin-bottom:10px;">
+            <div style="font-size:0.78rem; color:#5f6368; margin-bottom:3px;">支援種別</div>
+            <label style="margin-right:14px;"><input type="radio" name="manualType" value="訪問" checked onchange="onManualTypeChange()"> 訪問</label>
+            <label><input type="radio" name="manualType" value="オンライン" onchange="onManualTypeChange()"> オンライン</label>
+          </div>
+          <div style="margin-bottom:14px;">
+            <div style="font-size:0.78rem; color:#5f6368; margin-bottom:3px;">時間帯</div>
+            <div id="manualVisitTimeBlock">
+              <select id="manualDialogTime" style="width:100%; padding:6px 8px; border:1.5px solid #dadce0; border-radius:6px;">
+                <option value="09:00-12:00">AM（09:00-12:00）</option>
+                <option value="13:30-16:30">PM（13:30-16:30）</option>
+                <option value="09:00-16:00">終日（09:00-16:00）</option>
+              </select>
+            </div>
+            <div id="manualOnlineTimeBlock" style="display:none;">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <input type="time" id="manualOnlineStart" value="10:00" style="padding:5px 8px; border:1.5px solid #dadce0; border-radius:6px;">
+                <span>〜</span>
+                <input type="time" id="manualOnlineEnd" value="11:00" style="padding:5px 8px; border:1.5px solid #dadce0; border-radius:6px;">
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; justify-content:flex-end;">
+            <button class="btn btn-outline" id="manualDeleteBtn" style="display:none;" onclick="deleteManualEntry()">削除</button>
+            <button class="btn btn-outline" style="color:#5f6368; border-color:#dadce0;" onclick="closeManualDialog()">キャンセル</button>
+            <button class="btn btn-primary" onclick="saveManualEntry()">保存</button>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -178,6 +261,9 @@
   var saHolidays = JSON.parse(<?!= JSON.stringify(holidays) ?>);
   var saMeetings = JSON.parse(<?!= JSON.stringify(meetings) ?>);
   var saStaffOff = JSON.parse(<?!= JSON.stringify(staffOff) ?>);
+  var manualSchedules = JSON.parse(<?!= JSON.stringify(manualSchedules) ?>);
+  var manualSchools = JSON.parse(<?!= JSON.stringify(manualSchools) ?>);
+  var myManualSchools = JSON.parse(<?!= JSON.stringify(myManualSchools) ?>);
 
   // 祝日
   var JP_HOLIDAYS = {
@@ -541,6 +627,320 @@
   }
 
   function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+
+  // ============================================
+  // タブ切替
+  // ============================================
+  function staffTab(id) {
+    var conts = document.querySelectorAll('.staff-tab-content');
+    for (var i = 0; i < conts.length; i++) conts[i].classList.remove('active');
+    document.getElementById('staffTab-' + id).classList.add('active');
+    var links = document.querySelectorAll('.staff-tabbar a');
+    for (var i = 0; i < links.length; i++) links[i].classList.remove('active');
+    document.getElementById('staffTabLink-' + id).classList.add('active');
+    if (id === 'manual') renderManualUI();
+  }
+
+  // ============================================
+  // 手入力スケジュール UI（変更2）
+  // ============================================
+  var manualState = { year: null, month: null, editing: null, draft: null };
+
+  function initManualState() {
+    if (manualState.year && manualState.month) return;
+    var tm = (settings && settings.targetMonth) ? settings.targetMonth : '2026-06';
+    var p = tm.split('-');
+    manualState.year = parseInt(p[0], 10);
+    manualState.month = parseInt(p[1], 10);
+  }
+
+  function getManualMonthKey() {
+    return manualState.year + '-' + String(manualState.month).padStart(2, '0');
+  }
+
+  function changeManualMonth(delta) {
+    initManualState();
+    manualState.month += delta;
+    if (manualState.month < 1) { manualState.month = 12; manualState.year--; }
+    if (manualState.month > 12) { manualState.month = 1; manualState.year++; }
+    reloadManualSchedules(function() { renderManualUI(); });
+  }
+
+  function reloadManualSchedules(cb) {
+    google.script.run
+      .withSuccessHandler(function(rows) { manualSchedules = rows || []; if (cb) cb(); })
+      .withFailureHandler(function(err) { showManualMsg('再読込に失敗: ' + err.message, 'error'); })
+      .getManualSchedules(getManualMonthKey());
+  }
+
+  function showManualMsg(text, cls) {
+    var el = document.getElementById('manualMsg');
+    if (!el) return;
+    el.textContent = text;
+    el.className = 'msg ' + (cls || '');
+    el.style.display = 'inline-block';
+    setTimeout(function() { el.style.display = 'none'; }, 3500);
+  }
+
+  function renderManualUI() {
+    initManualState();
+    document.getElementById('manualMonthLabel').textContent = manualState.year + '年' + manualState.month + '月';
+    renderManualSidebar();
+    renderManualCalendar();
+  }
+
+  function renderManualSidebar() {
+    var pane = document.getElementById('manualSchoolPane');
+    var html = '';
+    if (!myStaffName) {
+      pane.innerHTML = '<div style="font-size:0.82rem; color:#9aa0a6; padding:10px;">支援員として認識されていません。</div>';
+      return;
+    }
+    if (!myManualSchools || myManualSchools.length === 0) {
+      html += '<div style="font-size:0.82rem; color:#9aa0a6; padding:10px;">あなたが担当する手入力カテゴリの学校はありません。</div>';
+    } else {
+      html += '<div style="font-size:0.78rem; font-weight:700; color:#5f6368; margin-bottom:8px;">学校をカレンダーにドラッグ</div>';
+      // 自治体ごとにグループ
+      var groups = {};
+      for (var i = 0; i < myManualSchools.length; i++) {
+        var s = myManualSchools[i];
+        var k = s.municipality || '未設定';
+        if (!groups[k]) groups[k] = [];
+        groups[k].push(s);
+      }
+      var keys = Object.keys(groups).sort();
+      for (var ki = 0; ki < keys.length; ki++) {
+        var k = keys[ki];
+        html += '<div style="margin-bottom:12px;">';
+        html += '<div style="font-size:0.72rem; font-weight:700; color:#e8710a; margin-bottom:6px; padding-bottom:4px; border-bottom:1px solid #e8eaed;">' + esc(k) + '</div>';
+        for (var si = 0; si < groups[k].length; si++) {
+          var sch = groups[k][si];
+          var d = 'data-name="' + esc(sch.schoolName) + '" data-staff="' + esc(sch.staffName) + '" data-muni="' + esc(sch.municipality) + '"';
+          html += '<div draggable="true" ' + d +
+            ' ondragstart="onManualDragStart(event)"' +
+            ' style="background:#fff7f0; border:1px solid #ffe0c2; border-radius:6px; padding:7px 9px; margin-bottom:6px; cursor:grab; font-size:0.82rem;">';
+          html += '<div style="font-weight:600;">' + esc(sch.schoolName) + '</div>';
+          html += '</div>';
+        }
+        html += '</div>';
+      }
+    }
+    pane.innerHTML = html;
+  }
+
+  function renderManualCalendar() {
+    var cont = document.getElementById('manualCalendar');
+    var y = manualState.year, m = manualState.month;
+    var first = new Date(y, m - 1, 1);
+    var firstDow = first.getDay();
+    var lastDay = new Date(y, m, 0).getDate();
+    var monthKey = getManualMonthKey();
+
+    var byDate = {};
+    for (var i = 0; i < manualSchedules.length; i++) {
+      var s = manualSchedules[i];
+      if (s.targetMonth !== monthKey) continue;
+      if (!byDate[s.date]) byDate[s.date] = [];
+      byDate[s.date].push(s);
+    }
+
+    var html = '<table style="width:100%; border-collapse:collapse; table-layout:fixed; min-width:720px;">';
+    html += '<thead><tr>';
+    var dows = ['日','月','火','水','木','金','土'];
+    for (var d = 0; d < 7; d++) {
+      var color = (d === 0) ? '#d93025' : (d === 6) ? '#1a73e8' : '#5f6368';
+      html += '<th style="padding:6px 4px; border:1px solid #dadce0; background:#f8f9fa; font-size:0.78rem; color:' + color + ';">' + dows[d] + '</th>';
+    }
+    html += '</tr></thead><tbody>';
+
+    var dayNum = 1;
+    for (var w = 0; w < 6 && dayNum <= lastDay; w++) {
+      html += '<tr>';
+      for (var d = 0; d < 7; d++) {
+        var cellIdx = w * 7 + d;
+        if (cellIdx < firstDow || dayNum > lastDay) {
+          html += '<td style="border:1px solid #dadce0; background:#fafafa; height:80px;"></td>';
+        } else {
+          var dateStr = y + '-' + String(m).padStart(2,'0') + '-' + String(dayNum).padStart(2,'0');
+          var isHoliday = JP_HOLIDAYS[dateStr];
+          var entries = byDate[dateStr] || [];
+          var bg = (d === 0 || d === 6 || isHoliday) ? '#fafafa' : '#fff';
+          html += '<td style="border:1px solid #dadce0; vertical-align:top; padding:4px; height:80px; background:' + bg + ';" ondragover="onManualDragOver(event)" ondrop="onManualDrop(event, \'' + dateStr + '\')">';
+          html += '<div style="font-size:0.72rem; color:#5f6368; margin-bottom:2px;">' + dayNum + (isHoliday ? '<span style="color:#d93025; margin-left:3px;">祝</span>' : '') + '</div>';
+          for (var ei = 0; ei < entries.length; ei++) {
+            var e = entries[ei];
+            var isMine = (e.staffName === myStaffName);
+            var bgColor = isMine
+              ? (e.supportType === 'オンライン' ? '#34a853' : '#e8710a')
+              : '#9aa0a6';
+            var cursor = isMine ? 'pointer' : 'default';
+            html += '<div onclick="' + (isMine ? 'editManualEntry(\'' + esc(e.id) + '\')' : '') + '" style="background:' + bgColor + '; color:#fff; font-size:0.7rem; padding:2px 5px; border-radius:4px; margin-bottom:2px; cursor:' + cursor + '; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(e.schoolName + ' / ' + e.staffName + ' / ' + e.timeSlot) + (isMine ? '' : '（他支援員）') + '">';
+            html += esc(e.schoolName) + '<span style="opacity:0.75; margin-left:3px;">' + esc(e.timeSlot) + '</span>';
+            html += '</div>';
+          }
+          html += '</td>';
+          dayNum++;
+        }
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    cont.innerHTML = html;
+  }
+
+  function onManualDragStart(e) {
+    var d = e.currentTarget;
+    var payload = {
+      schoolName: d.getAttribute('data-name'),
+      staffName:  d.getAttribute('data-staff'),
+      municipality: d.getAttribute('data-muni')
+    };
+    e.dataTransfer.setData('text/plain', JSON.stringify(payload));
+    e.dataTransfer.effectAllowed = 'copy';
+  }
+  function onManualDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }
+  function onManualDrop(e, dateStr) {
+    e.preventDefault();
+    var raw = e.dataTransfer.getData('text/plain');
+    if (!raw) return;
+    try {
+      var payload = JSON.parse(raw);
+      // 支援員画面では自分の担当校のみD&D可（draggable 側で制御済みだが念のため）
+      if (payload.staffName !== myStaffName) {
+        showManualMsg('自分の担当校のみ追加できます', 'error');
+        return;
+      }
+      openManualDialog({
+        editing: null,
+        date: dateStr,
+        schoolName: payload.schoolName,
+        staffName: payload.staffName,
+        municipality: payload.municipality,
+        timeSlot: '09:00-12:00',
+        supportType: '訪問'
+      });
+    } catch (err) { /* noop */ }
+  }
+
+  function editManualEntry(id) {
+    var entry = null;
+    for (var i = 0; i < manualSchedules.length; i++) {
+      if (manualSchedules[i].id === id) { entry = manualSchedules[i]; break; }
+    }
+    if (!entry) return;
+    if (entry.staffName !== myStaffName) {
+      showManualMsg('他の支援員の予定は編集できません', 'error');
+      return;
+    }
+    openManualDialog({
+      editing: entry, date: entry.date, schoolName: entry.schoolName,
+      staffName: entry.staffName, municipality: entry.municipality,
+      timeSlot: entry.timeSlot, supportType: entry.supportType
+    });
+  }
+
+  function openManualDialog(opts) {
+    manualState.editing = opts.editing;
+    manualState.draft = opts;
+    document.getElementById('manualDialogTitle').textContent = opts.editing ? '手入力予定の編集' : '手入力予定の追加';
+    document.getElementById('manualDialogSchool').textContent = opts.schoolName + '（' + (opts.municipality || '') + '）';
+    document.getElementById('manualDialogStaff').textContent = opts.staffName;
+    document.getElementById('manualDialogDate').value = opts.date || '';
+    var typeRadios = document.querySelectorAll('input[name="manualType"]');
+    for (var i = 0; i < typeRadios.length; i++) {
+      typeRadios[i].checked = (typeRadios[i].value === (opts.supportType || '訪問'));
+    }
+    onManualTypeChange();
+    if (opts.supportType === 'オンライン') {
+      var parts = String(opts.timeSlot || '10:00-11:00').split('-');
+      document.getElementById('manualOnlineStart').value = parts[0] || '10:00';
+      document.getElementById('manualOnlineEnd').value   = parts[1] || '11:00';
+    } else {
+      var sel = document.getElementById('manualDialogTime');
+      sel.value = opts.timeSlot || '09:00-12:00';
+      var found = false;
+      for (var k = 0; k < sel.options.length; k++) if (sel.options[k].value === sel.value) { found = true; break; }
+      if (!found) {
+        var op = document.createElement('option'); op.value = opts.timeSlot; op.textContent = opts.timeSlot; sel.appendChild(op);
+        sel.value = opts.timeSlot;
+      }
+    }
+    document.getElementById('manualDeleteBtn').style.display = opts.editing ? 'inline-block' : 'none';
+    document.getElementById('manualEditDialog').style.display = 'flex';
+  }
+  function closeManualDialog() {
+    document.getElementById('manualEditDialog').style.display = 'none';
+    manualState.editing = null; manualState.draft = null;
+  }
+  function onManualTypeChange() {
+    var isOnline = false;
+    var typeRadios = document.querySelectorAll('input[name="manualType"]');
+    for (var i = 0; i < typeRadios.length; i++) {
+      if (typeRadios[i].checked && typeRadios[i].value === 'オンライン') isOnline = true;
+    }
+    document.getElementById('manualVisitTimeBlock').style.display = isOnline ? 'none' : 'block';
+    document.getElementById('manualOnlineTimeBlock').style.display = isOnline ? 'block' : 'none';
+  }
+  function getDialogTimeSlot_() {
+    var isOnline = false;
+    var typeRadios = document.querySelectorAll('input[name="manualType"]');
+    for (var i = 0; i < typeRadios.length; i++) {
+      if (typeRadios[i].checked && typeRadios[i].value === 'オンライン') isOnline = true;
+    }
+    if (isOnline) {
+      var s = document.getElementById('manualOnlineStart').value;
+      var e = document.getElementById('manualOnlineEnd').value;
+      return { type: 'オンライン', timeSlot: s + '-' + e };
+    }
+    return { type: '訪問', timeSlot: document.getElementById('manualDialogTime').value };
+  }
+  function saveManualEntry() {
+    var draft = manualState.draft;
+    if (!draft) return;
+    var ts = getDialogTimeSlot_();
+    var date = document.getElementById('manualDialogDate').value;
+    if (!date) { showManualMsg('日付を指定してください', 'error'); return; }
+    var entry = {
+      targetMonth: date.substring(0, 7),
+      date: date, staffName: draft.staffName, schoolName: draft.schoolName,
+      municipality: draft.municipality, timeSlot: ts.timeSlot, supportType: ts.type, status: '仮'
+    };
+    var runner = manualState.editing
+      ? google.script.run.updateManualSchedule
+      : google.script.run.addManualSchedule;
+    var handler = function(r) {
+      closeManualDialog();
+      if (r.success) {
+        showManualMsg(manualState.editing ? '更新しました' : '追加しました', 'success');
+        var mk = entry.targetMonth.split('-');
+        manualState.year = parseInt(mk[0],10); manualState.month = parseInt(mk[1],10);
+        reloadManualSchedules(function() { renderManualUI(); });
+      } else {
+        showManualMsg(r.message || '保存失敗', 'error');
+      }
+    };
+    var fail = function(err) { showManualMsg(err.message, 'error'); };
+    if (manualState.editing) {
+      google.script.run.withSuccessHandler(handler).withFailureHandler(fail).updateManualSchedule(manualState.editing.id, entry);
+    } else {
+      google.script.run.withSuccessHandler(handler).withFailureHandler(fail).addManualSchedule(entry);
+    }
+  }
+  function deleteManualEntry() {
+    if (!manualState.editing) return;
+    if (!confirm('この予定を削除しますか？')) return;
+    var id = manualState.editing.id;
+    google.script.run
+      .withSuccessHandler(function(r) {
+        closeManualDialog();
+        if (r.success) {
+          showManualMsg('削除しました', 'success');
+          reloadManualSchedules(function() { renderManualUI(); });
+        } else { showManualMsg(r.message || '削除失敗', 'error'); }
+      })
+      .withFailureHandler(function(err) { showManualMsg(err.message, 'error'); })
+      .deleteManualSchedule(id);
+  }
 </script>
 </body>
 </html>

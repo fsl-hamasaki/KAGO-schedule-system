@@ -471,6 +471,9 @@
     </div>
     <div id="confirmedScheduleArea"></div>
 
+    <!-- 自治体スコープ 手入力スケジュール（変更2） -->
+    <div id="myMunicipalityManualArea"></div>
+
     <!-- Calendar Card（受付中の対象月） -->
     <div class="card" id="calendarCard" style="margin-bottom:20px; display:none;">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
@@ -527,16 +530,9 @@
             </div>
           </div>
 
-          <!-- 時間帯（オンライン） -->
-          <div id="timeSlotOnline1" style="display:none;">
-            <div style="font-size:0.82rem; font-weight:600; color:#5f6368; margin-bottom:6px;">時間帯</div>
-            <div style="display:flex; align-items:center; gap:6px; font-size:0.88rem;">
-              <input type="time" id="onlineStart1" value="10:00" style="padding:4px 8px; border:1.5px solid #dadce0; border-radius:6px; font-size:0.85rem;">
-              <span>〜</span>
-              <input type="time" id="onlineEnd1" value="11:00" style="padding:4px 8px; border:1.5px solid #dadce0; border-radius:6px; font-size:0.85rem;">
-            </div>
-            <div style="font-size:0.72rem; color:#9aa0a6; margin-top:2px;">1時間以上</div>
-            <div id="onlineTimeError1" class="date-error"></div>
+          <!-- オンライン時の案内（時刻は各候補日の右に個別入力） -->
+          <div id="onlineHint1" style="display:none; align-self:center; font-size:0.78rem; color:#5f6368;">
+            <span style="display:inline-block; padding:4px 10px; background:#e8f0fe; border:1px solid #c6dafc; border-radius:6px;">時刻は各候補日ごとに指定してください</span>
           </div>
         </div>
 
@@ -597,15 +593,8 @@
               </div>
             </div>
 
-            <div id="timeSlotOnline2" style="display:none;">
-              <div style="font-size:0.82rem; font-weight:600; color:#5f6368; margin-bottom:6px;">時間帯</div>
-              <div style="display:flex; align-items:center; gap:6px; font-size:0.88rem;">
-                <input type="time" id="onlineStart2" value="10:00" style="padding:4px 8px; border:1.5px solid #dadce0; border-radius:6px; font-size:0.85rem;">
-                <span>〜</span>
-                <input type="time" id="onlineEnd2" value="11:00" style="padding:4px 8px; border:1.5px solid #dadce0; border-radius:6px; font-size:0.85rem;">
-              </div>
-              <div style="font-size:0.72rem; color:#9aa0a6; margin-top:2px;">1時間以上</div>
-              <div id="onlineTimeError2" class="date-error"></div>
+            <div id="onlineHint2" style="display:none; align-self:center; font-size:0.78rem; color:#5f6368;">
+              <span style="display:inline-block; padding:4px 10px; background:#e8f0fe; border:1px solid #c6dafc; border-radius:6px;">時刻は各候補日ごとに指定してください</span>
             </div>
           </div>
 
@@ -664,7 +653,9 @@
   var schoolSchedule = JSON.parse(<?!= JSON.stringify(schoolSchedule) ?>);
   var staffFullSchedule = JSON.parse(<?!= JSON.stringify(staffFullSchedule) ?>);
   var myStaffName = <?!= JSON.stringify(staffName) ?>;
-  var supportCategory = <?!= JSON.stringify(supportCategory) ?>; // '離島' or '通常'
+  var supportCategory = <?!= JSON.stringify(supportCategory) ?>; // '離島' or '通常' or '市町村' or '手入力'
+  var myMunicipality = <?!= JSON.stringify(municipality) ?>;
+  var myMunicipalityManual = JSON.parse(<?!= JSON.stringify(myMunicipalityManual) ?>);
 
   var NO_PREFERENCE = '特に指定しない';
 
@@ -719,6 +710,9 @@
 
     // 確定済みスケジュールを月ごとに表示（対象年月に依存しない）
     renderConfirmedSchedules();
+
+    // 自治体スコープの手入力スケジュール
+    renderMyMunicipalityManual();
 
     // 受付中の場合のみ候補日入力フォームとカレンダーを表示
     if (settings.targetMonth) {
@@ -1047,7 +1041,15 @@
       if (radios[i].checked && radios[i].value === 'オンライン') isOnline = true;
     }
     document.getElementById('timeSlotVisit' + visitNum).style.display = isOnline ? 'none' : 'block';
-    document.getElementById('timeSlotOnline' + visitNum).style.display = isOnline ? 'block' : 'none';
+    var hint = document.getElementById('onlineHint' + visitNum);
+    if (hint) hint.style.display = isOnline ? 'block' : 'none';
+
+    // 候補日ごとのオンライン時刻入力ブロックを表示/非表示
+    var prefix = visitNum === 1 ? 'v1' : 'v2';
+    for (var n = 1; n <= 3; n++) {
+      var block = document.getElementById(prefix + 'c' + n + '_online');
+      if (block) block.style.display = isOnline ? 'block' : 'none';
+    }
   }
 
   // 2回目支援トグル
@@ -1056,32 +1058,39 @@
     document.getElementById('secondVisitArea').style.display = checked ? 'block' : 'none';
   }
 
-  // オンライン時間バリデーション
-  function validateOnlineTime(visitNum) {
-    var start = document.getElementById('onlineStart' + visitNum).value;
-    var end = document.getElementById('onlineEnd' + visitNum).value;
-    var errEl = document.getElementById('onlineTimeError' + visitNum);
-    if (!start || !end) { errEl.textContent = ''; return false; }
+  // オンライン時間バリデーション（候補日単位、空欄＝指定なし扱いでOK）
+  function validateOnlineTimeForCandidate(prefix, n) {
+    var start = document.getElementById(prefix + 'c' + n + '_oStart').value;
+    var end = document.getElementById(prefix + 'c' + n + '_oEnd').value;
+    var errEl = document.getElementById(prefix + 'c' + n + '_oErr');
+    if (!start && !end) { errEl.textContent = ''; return { ok: true, empty: true, value: '' }; }
+    if (!start || !end) {
+      errEl.textContent = '開始時刻と終了時刻の両方を指定してください';
+      return { ok: false, empty: false, value: '' };
+    }
     var startMin = parseInt(start.split(':')[0]) * 60 + parseInt(start.split(':')[1]);
     var endMin = parseInt(end.split(':')[0]) * 60 + parseInt(end.split(':')[1]);
     if (endMin - startMin < 60) {
       errEl.textContent = '1時間以上を指定してください';
-      return false;
+      return { ok: false, empty: false, value: '' };
     }
     errEl.textContent = '';
-    return true;
+    return { ok: true, empty: false, value: start + '-' + end };
   }
 
-  // 時間帯取得ヘルパー
-  function getTimeSlot(visitNum) {
-    var radios = document.querySelectorAll('input[name="supportType' + (visitNum === 1 ? '' : '2') + '"]');
-    var isOnline = false;
-    for (var i = 0; i < radios.length; i++) {
-      if (radios[i].checked && radios[i].value === 'オンライン') isOnline = true;
-    }
-    if (isOnline) {
-      return document.getElementById('onlineStart' + visitNum).value + '-' + document.getElementById('onlineEnd' + visitNum).value;
-    }
+  // 復元用: 候補日のオンライン時刻入力に値を反映
+  function applyOnlineTimeToCandidate(prefix, n, value) {
+    if (!value) return;
+    var parts = String(value).split('-');
+    if (parts.length !== 2) return;
+    var sEl = document.getElementById(prefix + 'c' + n + '_oStart');
+    var eEl = document.getElementById(prefix + 'c' + n + '_oEnd');
+    if (sEl) sEl.value = parts[0];
+    if (eEl) eEl.value = parts[1];
+  }
+
+  // 訪問時の時間帯取得（共通ラジオから）
+  function getVisitTimeSlot(visitNum) {
     if (isIsland) return '09:00-16:00';
     var timeRadios = document.querySelectorAll('input[name="timeSlot' + visitNum + '"]');
     for (var i = 0; i < timeRadios.length; i++) {
@@ -1103,6 +1112,9 @@
     var container = document.getElementById(containerId + 'Candidates');
     var html = '<div class="candidates-grid">';
     var labels = ['第1候補', '第2候補', '第3候補'];
+    // 初期デフォルト時刻（候補によって少しずらす）
+    var defStart = ['10:00', '10:00', '13:30'];
+    var defEnd   = ['11:00', '12:00', '14:30'];
 
     for (var i = 0; i < 3; i++) {
       var n = i + 1;
@@ -1122,6 +1134,17 @@
       html += ' onchange="validateDateInput(\'' + prefix + 'c' + n + '\')">';
       html += '</div>';
       html += '<div class="date-error" id="' + errId + '"></div>';
+
+      // オンライン時刻入力（初期は非表示。supportType=オンライン選択時に表示）
+      html += '<div class="online-time-row" id="' + prefix + 'c' + n + '_online" style="display:none; margin-top:6px; padding-left:22px;">';
+      html += '<div style="font-size:0.78rem; color:#5f6368; margin-bottom:4px;">この候補日の希望時刻</div>';
+      html += '<div style="display:flex; align-items:center; gap:6px; font-size:0.85rem;">';
+      html += '<input type="time" id="' + prefix + 'c' + n + '_oStart" value="' + defStart[i] + '" style="padding:4px 8px; border:1.5px solid #dadce0; border-radius:6px; font-size:0.85rem;" onchange="validateOnlineTimeForCandidate(\'' + prefix + '\', ' + n + ')">';
+      html += '<span>〜</span>';
+      html += '<input type="time" id="' + prefix + 'c' + n + '_oEnd" value="' + defEnd[i] + '" style="padding:4px 8px; border:1.5px solid #dadce0; border-radius:6px; font-size:0.85rem;" onchange="validateOnlineTimeForCandidate(\'' + prefix + '\', ' + n + ')">';
+      html += '</div>';
+      html += '<div class="date-error" id="' + prefix + 'c' + n + '_oErr" style="font-size:0.75rem;"></div>';
+      html += '</div>';
 
       html += '<div class="choice-row">';
       html += '<input type="radio" name="' + radioName + '" id="' + radioName + '_none" value="none" onchange="onChoiceChange(\'' + prefix + 'c' + n + '\')">';
@@ -1175,11 +1198,11 @@
     // 1回目 時間帯の復元
     if (existing.timeSlot) {
       if (existing.supportType === 'オンライン') {
-        var parts = existing.timeSlot.split('-');
-        if (parts.length === 2) {
-          document.getElementById('onlineStart1').value = parts[0];
-          document.getElementById('onlineEnd1').value = parts[1];
-        }
+        // 第1候補時刻
+        applyOnlineTimeToCandidate('v1', 1, existing.timeSlot);
+        // 第2, 第3候補時刻
+        if (existing.timeSlot1_2) applyOnlineTimeToCandidate('v1', 2, existing.timeSlot1_2);
+        if (existing.timeSlot1_3) applyOnlineTimeToCandidate('v1', 3, existing.timeSlot1_3);
       } else {
         var tsRadios = document.querySelectorAll('input[name="timeSlot1"]');
         for (var i = 0; i < tsRadios.length; i++) {
@@ -1229,11 +1252,9 @@
       // 2回目 時間帯の復元
       if (existing.timeSlot2) {
         if (existing.supportType2 === 'オンライン') {
-          var parts2 = existing.timeSlot2.split('-');
-          if (parts2.length === 2) {
-            document.getElementById('onlineStart2').value = parts2[0];
-            document.getElementById('onlineEnd2').value = parts2[1];
-          }
+          applyOnlineTimeToCandidate('v2', 1, existing.timeSlot2);
+          if (existing.timeSlot2_2) applyOnlineTimeToCandidate('v2', 2, existing.timeSlot2_2);
+          if (existing.timeSlot2_3) applyOnlineTimeToCandidate('v2', 3, existing.timeSlot2_3);
         } else {
           var ts2Radios = document.querySelectorAll('input[name="timeSlot2"]');
           for (var i = 0; i < ts2Radios.length; i++) {
@@ -1271,34 +1292,67 @@
     var formData = {};
     var wantSecond = document.getElementById('wantSecond').checked;
 
-    // 1回目 支援種別・時間帯
+    // 1回目 支援種別
     formData.supportType = getSupportType(1);
-    if (formData.supportType === 'オンライン' && !validateOnlineTime(1)) {
-      showMessage('1回目支援のオンライン時間帯が不正です（1時間以上を指定してください）。', 'error');
-      return;
-    }
-    formData.timeSlot = getTimeSlot(1);
 
     // 1回目 候補日
     var fields = [
-      { key: 'v1c1', label: '1回目 第1候補' },
-      { key: 'v1c2', label: '1回目 第2候補' },
-      { key: 'v1c3', label: '1回目 第3候補' }
+      { key: 'v1c1', label: '1回目 第1候補', prefix: 'v1', n: 1 },
+      { key: 'v1c2', label: '1回目 第2候補', prefix: 'v1', n: 2 },
+      { key: 'v1c3', label: '1回目 第3候補', prefix: 'v1', n: 3 }
     ];
 
     if (wantSecond) {
-      // 2回目 支援種別・時間帯
+      // 2回目 支援種別
       formData.supportType2 = getSupportType(2);
-      if (formData.supportType2 === 'オンライン' && !validateOnlineTime(2)) {
-        showMessage('2回目支援のオンライン時間帯が不正です（1時間以上を指定してください）。', 'error');
-        return;
-      }
-      formData.timeSlot2 = getTimeSlot(2);
 
-      fields.push({ key: 'v2c1', label: '2回目 第1候補' });
-      fields.push({ key: 'v2c2', label: '2回目 第2候補' });
-      fields.push({ key: 'v2c3', label: '2回目 第3候補' });
+      fields.push({ key: 'v2c1', label: '2回目 第1候補', prefix: 'v2', n: 1 });
+      fields.push({ key: 'v2c2', label: '2回目 第2候補', prefix: 'v2', n: 2 });
+      fields.push({ key: 'v2c3', label: '2回目 第3候補', prefix: 'v2', n: 3 });
     }
+
+    // 1回目 訪問時の時間帯（オンライン時は後で候補日ごとの時刻から組み立て）
+    if (formData.supportType !== 'オンライン') {
+      formData.timeSlot = getVisitTimeSlot(1);
+    }
+    if (wantSecond && formData.supportType2 !== 'オンライン') {
+      formData.timeSlot2 = getVisitTimeSlot(2);
+    }
+
+    // オンライン時の希望別時刻を集める（候補日が「特に指定しない」でも、入力されていれば取得）
+    var onlineSlots = { v1: ['', '', ''], v2: ['', '', ''] };
+    var visitsToCheck = [{ vn: 1, prefix: 'v1', stype: formData.supportType }];
+    if (wantSecond) visitsToCheck.push({ vn: 2, prefix: 'v2', stype: formData.supportType2 });
+
+    for (var vi = 0; vi < visitsToCheck.length; vi++) {
+      var v = visitsToCheck[vi];
+      if (v.stype !== 'オンライン') continue;
+      for (var n = 1; n <= 3; n++) {
+        // 「特に指定しない」の候補日には時刻不要
+        var noneRadio = document.getElementById(v.prefix + 'c' + n + '_type_none');
+        if (noneRadio && noneRadio.checked) {
+          onlineSlots[v.prefix][n - 1] = '';
+          continue;
+        }
+        var r = validateOnlineTimeForCandidate(v.prefix, n);
+        if (!r.ok) {
+          showMessage(v.vn + '回目 第' + n + '候補のオンライン時間帯が不正です（1時間以上を指定してください）。', 'error');
+          return;
+        }
+        if (r.empty) {
+          showMessage(v.vn + '回目 第' + n + '候補のオンライン時刻を指定してください。', 'error');
+          return;
+        }
+        onlineSlots[v.prefix][n - 1] = r.value;
+      }
+      // 1回目/2回目の代表時刻は第1候補の時刻を使う
+      if (v.vn === 1) formData.timeSlot = onlineSlots.v1[0];
+      else formData.timeSlot2 = onlineSlots.v2[0];
+    }
+    formData.timeSlot1_2 = onlineSlots.v1[1];
+    formData.timeSlot1_3 = onlineSlots.v1[2];
+    formData.timeSlot2_2 = onlineSlots.v2[1];
+    formData.timeSlot2_3 = onlineSlots.v2[2];
 
     for (var i = 0; i < fields.length; i++) {
       var f = fields[i];
@@ -1627,6 +1681,64 @@
     html += '</div>';
 
     document.getElementById('staffScheduleArea').innerHTML = html;
+  }
+
+  // ===== 自治体スコープの手入力スケジュール（変更2） =====
+  // 自校（userData.schoolName）の予定は詳細表示、同一自治体内の他校はマスク・グレーアウト表示
+  function renderMyMunicipalityManual() {
+    var area = document.getElementById('myMunicipalityManualArea');
+    if (!area) return;
+    if (supportCategory !== '手入力') { area.innerHTML = ''; return; }
+    if (!myMunicipalityManual || myMunicipalityManual.length === 0) {
+      area.innerHTML = '';
+      return;
+    }
+    // 月別にグルーピング → 日付順
+    var byMonth = {};
+    for (var i = 0; i < myMunicipalityManual.length; i++) {
+      var m = myMunicipalityManual[i];
+      if (!byMonth[m.targetMonth]) byMonth[m.targetMonth] = [];
+      byMonth[m.targetMonth].push(m);
+    }
+    var months = Object.keys(byMonth).sort();
+    var html = '<div class="card" style="margin-bottom:20px;">';
+    html += '<div style="font-size:1rem; font-weight:700; color:#202124; margin-bottom:10px;">' + esc(myMunicipality) + ' のICT支援予定（' + esc(userData.schoolName) + '）</div>';
+    html += '<div style="font-size:0.78rem; color:#5f6368; margin-bottom:12px;">自校分は詳細表示、自治体内の他校分はグレーアウトで表示します</div>';
+    for (var mi = 0; mi < months.length; mi++) {
+      var month = months[mi];
+      var rows = byMonth[month];
+      rows.sort(function(a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+      html += '<div style="margin-bottom:14px;">';
+      html += '<div style="font-size:0.85rem; font-weight:700; color:#202124; margin-bottom:6px;">' + esc(month) + '</div>';
+      html += '<table style="width:100%; border-collapse:collapse; font-size:0.82rem;">';
+      html += '<thead><tr style="background:#f8f9fa;">';
+      html += '<th style="padding:7px 8px; text-align:left; border-bottom:1px solid #e0e0e0; color:#5f6368;">日付</th>';
+      html += '<th style="padding:7px 8px; text-align:left; border-bottom:1px solid #e0e0e0; color:#5f6368;">学校</th>';
+      html += '<th style="padding:7px 8px; text-align:left; border-bottom:1px solid #e0e0e0; color:#5f6368;">時間帯</th>';
+      html += '<th style="padding:7px 8px; text-align:left; border-bottom:1px solid #e0e0e0; color:#5f6368;">種別</th>';
+      html += '<th style="padding:7px 8px; text-align:left; border-bottom:1px solid #e0e0e0; color:#5f6368;">担当</th>';
+      html += '</tr></thead><tbody>';
+      for (var ri = 0; ri < rows.length; ri++) {
+        var r = rows[ri];
+        var isMine = (r.schoolName === userData.schoolName);
+        var bg = isMine ? '#e8f0fe' : '#f6f7f9';
+        var color = isMine ? '#202124' : '#9aa0a6';
+        var schoolLabel = isMine ? esc(r.schoolName) : '他校';
+        var staffLabel = isMine ? esc(r.staffName) : '—';
+        var timeLabel = isMine ? esc(r.timeSlot) : '—';
+        var typeLabel = isMine ? esc(r.supportType) : '—';
+        html += '<tr style="background:' + bg + '; color:' + color + ';">';
+        html += '<td style="padding:7px 8px; border-bottom:1px solid #f0f0f0;">' + esc(r.date) + '</td>';
+        html += '<td style="padding:7px 8px; border-bottom:1px solid #f0f0f0;">' + schoolLabel + '</td>';
+        html += '<td style="padding:7px 8px; border-bottom:1px solid #f0f0f0;">' + timeLabel + '</td>';
+        html += '<td style="padding:7px 8px; border-bottom:1px solid #f0f0f0;">' + typeLabel + '</td>';
+        html += '<td style="padding:7px 8px; border-bottom:1px solid #f0f0f0;">' + staffLabel + '</td>';
+        html += '</tr>';
+      }
+      html += '</tbody></table></div>';
+    }
+    html += '</div>';
+    area.innerHTML = html;
   }
 
   // ===== 日付バリデーション =====
