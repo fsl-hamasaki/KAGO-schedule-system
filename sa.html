@@ -2400,6 +2400,16 @@
 
   function renderManualSidebar() {
     var pane = document.getElementById('manualSchoolPane');
+    // 表示月の各校の予定件数（保存済み + ドラフト追加 - ドラフト削除）
+    var monthKey = getManualMonthKey();
+    var displayList = applyManualDraftToBase();
+    var countBySchool = {};
+    for (var i = 0; i < displayList.length; i++) {
+      var s = displayList[i];
+      if (s.targetMonth !== monthKey) continue;
+      countBySchool[s.schoolName] = (countBySchool[s.schoolName] || 0) + 1;
+    }
+
     var groups = {};
     for (var i = 0; i < manualSchools.length; i++) {
       var s = manualSchools[i];
@@ -2407,7 +2417,8 @@
       if (!groups[key]) groups[key] = [];
       groups[key].push(s);
     }
-    var html = '<div style="font-size:0.8rem; font-weight:700; color:#5f6368; margin-bottom:10px;">学校をカレンダーにドラッグ</div>';
+    var html = '<div style="font-size:0.8rem; font-weight:700; color:#5f6368; margin-bottom:6px;">学校をカレンダーにドラッグ</div>';
+    html += '<div style="font-size:0.7rem; color:#9aa0a6; margin-bottom:10px;">予定が入っている学校は半透明＋件数バッジで表示</div>';
     var keys = Object.keys(groups).sort();
     if (keys.length === 0) {
       html += '<div style="font-size:0.82rem; color:#9aa0a6; padding:10px;">手入力カテゴリの学校が未登録です</div>';
@@ -2418,12 +2429,19 @@
       html += '<div style="font-size:0.75rem; font-weight:700; color:#0d904f; margin-bottom:6px; padding-bottom:4px; border-bottom:1px solid #e8eaed;">' + esc(k) + '</div>';
       for (var si = 0; si < groups[k].length; si++) {
         var sch = groups[k][si];
+        var cnt = countBySchool[sch.schoolName] || 0;
+        var fadedStyle = cnt > 0 ? ' opacity:0.45;' : '';
         var dataAttr = 'data-code="' + esc(sch.schoolCode) + '" data-name="' + esc(sch.schoolName) + '" data-staff="' + esc(sch.staffName) + '" data-muni="' + esc(sch.municipality) + '"';
         html += '<div draggable="true" ' + dataAttr +
           ' ondragstart="onManualDragStart(event)"' +
-          ' style="background:#f8f9fa; border:1px solid #e8eaed; border-radius:6px; padding:7px 9px; margin-bottom:6px; cursor:grab; font-size:0.82rem;">';
-        html += '<div style="font-weight:600;">' + esc(sch.schoolName) + '</div>';
-        html += '<div style="font-size:0.72rem; color:#5f6368;">' + esc(sch.staffName) + '</div>';
+          ' style="background:#f8f9fa; border:1px solid #e8eaed; border-radius:6px; padding:7px 9px; margin-bottom:6px; cursor:grab; font-size:0.82rem; display:flex; align-items:center; justify-content:space-between; gap:6px;' + fadedStyle + '">';
+        html += '<div style="flex:1; min-width:0; overflow:hidden;">';
+        html += '<div style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + esc(sch.schoolName) + '</div>';
+        html += '<div style="font-size:0.72rem; color:#5f6368; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + esc(sch.staffName) + '</div>';
+        html += '</div>';
+        if (cnt > 0) {
+          html += '<span style="background:#0d904f; color:#fff; border-radius:10px; padding:1px 7px; font-size:0.68rem; font-weight:700; flex-shrink:0;">' + cnt + '件</span>';
+        }
         html += '</div>';
       }
       html += '</div>';
