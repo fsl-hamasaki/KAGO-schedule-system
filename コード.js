@@ -2834,42 +2834,102 @@ function setupSampleManualSchedule(targetMonth) {
   return { success: true, message: '手入力スケジュール サンプル投入: ' + added + '件（対象月: ' + targetMonth + '）' };
 }
 
-// 6月フルサンプル: 対象月設定 + 候補日要望 + 自動割当 + 手入力スケジュールを一括投入
-function setupSampleDataJun2026Full() {
-  var summary = [];
-
-  // 1. システム設定: 対象年月=2026-06、ステータス=締切
+// 6月要望サンプル: 5月20日時点で県立校+枕崎市から要望が集まった状態を再現
+// ・対象月=2026-06、締切日=2026-05-20、ステータス=締切
+// ・候補日シートに6月単月分の要望を投入（手入力カテゴリ校はスキップ）
+// ・スケジュールシート(自動割当結果)は空のまま
+// ・手入力スケジュールも空のまま
+// 動作確認シナリオ:
+//   1) このボタンで投入 → 2) SA画面で「自動割当実行」→「確定」
+//   3) 各支援員が手入力タブで予定追加 → 4) SA画面の統合スケジュールで全体確認
+function setupSampleDataJun2026() {
+  // 1. システム設定: 対象年月=2026-06、締切日=2026-05-20、ステータス=締切
   var settingsSheet = getOrCreateSheet_(SHEET_SETTINGS, ['設定名', '値']);
   var data = settingsSheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
     var key = String(data[i][0]).trim();
     if (key === '対象年月')   settingsSheet.getRange(i + 1, 2).setNumberFormat('@').setValue('2026-06');
-    if (key === '締切日')     settingsSheet.getRange(i + 1, 2).setValue('2026-05-25');
+    if (key === '締切日')     settingsSheet.getRange(i + 1, 2).setValue('2026-05-20');
     if (key === 'ステータス') settingsSheet.getRange(i + 1, 2).setValue('締切');
   }
-  summary.push('対象月=2026-06 ステータス=締切');
 
-  // 2. 6月+7月の候補日要望サンプル
-  var r1 = setupSampleDataJunJul2026();
-  if (!r1 || !r1.success) {
-    return { success: false, message: '候補日サンプル生成に失敗: ' + (r1 && r1.message ? r1.message : '不明') };
+  // 2. 学校マスタ読み込み
+  var allSchools = loadKagoSchools_();
+  if (!allSchools) return { success: false, message: '学校マスタが見つかりません。先に setupSchoolMaster を実行してください。' };
+
+  // 3. 教員アカウント生成（既存はスキップ）
+  var newUsersCount = ensureSampleTeacherAccounts_(allSchools);
+
+  // 4. 候補日シート: 対象月 2026-06 の既存データをクリアしてから6月分のみ投入
+  var candSheet = getOrCreateSheet_(SHEET_CANDIDATES, [
+    'メールアドレス', '学校名', '氏名', '対象年月',
+    '支援種別', '時間帯',
+    '1回目_第1候補', '1回目_第2候補', '1回目_第3候補',
+    '2回目希望', '2回目_支援種別', '2回目_時間帯',
+    '2回目_第1候補', '2回目_第2候補', '2回目_第3候補',
+    '備考', '送信日時', 'ICT支援要望',
+    '1回目_第2希望時刻', '1回目_第3希望時刻',
+    '2回目_第2希望時刻', '2回目_第3希望時刻'
+  ]);
+  ensureCandidateExtraColumns_(candSheet);
+  var existing = candSheet.getDataRange().getValues();
+  for (var i = existing.length - 1; i >= 1; i--) {
+    if (normalizeTargetMonth_(existing[i][3]) === '2026-06') candSheet.deleteRow(i + 1);
   }
-  summary.push(r1.message);
 
-  // 3. 自動割当（6月）
-  var r2 = null;
-  try {
-    r2 = autoAssignSchedule();
-  } catch (e) {
-    summary.push('自動割当エラー: ' + (e && e.message ? e.message : e));
+  // 5. 6月単月分布で候補日生成（県立校＋枕崎市のみ、手入力カテゴリはスキップ）
+  var weekdays = getWeekdaysInMonth_(2026, 6);
+  var rows = [];
+  for (var i = 0; i < allSchools.length; i++) {
+    var school = allSchools[i];
+    if (school.isManual) continue;
+    var rand = seededRand_(parseInt(school.code) * 53 + 6);
+
+    var plan;
+    if (school.isMakurazaki) {
+      plan = { v: 1, o: 0 };  // 枕崎市は基本1回訪問
+    } else {
+      // 県立校: 6月単月分布
+      var v = pickWeighted_([
+        { v: 0, w: 55 }, { v: 1, w: 38 }, { v: 2, w: 6 }, { v: 3, w: 1 }
+      ], rand());
+      var o = pickWeighted_([
+        { v: 0, w: 82 }, { v: 1, w: 16 }, { v: 2, w: 2 }
+      ], rand());
+      plan = { v: v, o: o };
+    }
+    var row = buildCandidateRow_(school, '2026-06', plan, weekdays, rand, i);
+    if (row) rows.push(row);
   }
-  if (r2) summary.push(r2.success ? r2.message : ('自動割当: ' + r2.message));
+  appendCandidateRows_(rows);
 
-  // 4. 6月の手入力スケジュールサンプル
-  var r3 = setupSampleManualSchedule('2026-06');
-  if (r3) summary.push(r3.success ? r3.message : ('手入力: ' + r3.message));
+  // 6. スケジュールシート（自動割当結果）と手入力スケジュールシートの 6月分はクリア
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var schedSheet = ss.getSheetByName(SHEET_SCHEDULE);
+  if (schedSheet) {
+    var sd = schedSheet.getDataRange().getValues();
+    for (var i = sd.length - 1; i >= 1; i--) {
+      if (normalizeTargetMonth_(sd[i][0]) === '2026-06') schedSheet.deleteRow(i + 1);
+    }
+  }
+  var manSheet = ss.getSheetByName(SHEET_MANUAL_SCHEDULE);
+  if (manSheet) {
+    var md = manSheet.getDataRange().getValues();
+    for (var i = md.length - 1; i >= 1; i--) {
+      if (normalizeTargetMonth_(md[i][1]) === '2026-06') manSheet.deleteRow(i + 1);
+    }
+  }
 
-  return { success: true, message: '【6月フルサンプル投入完了】 ' + summary.join(' ／ ') };
+  // 7. 支援員休日 + 定例会
+  var staffOffAdded = setupKagoMonthlyStaffOff_(2026, 6);
+  var meetingAdded  = setupKagoMonthlyMeeting_(2026, 6);
+
+  return {
+    success: true,
+    message: '【6月要望サンプル投入完了】対象月=2026-06 / ステータス=締切（自動割当前） / 教員追加' + newUsersCount + '名 / 候補日' + rows.length +
+      '件（県立校＋枕崎市） / 支援員休日' + staffOffAdded + '件' + (meetingAdded ? ' / 6月定例会追加' : '') +
+      ' ／ 自動割当・手入力は空。次は「スケジュール管理」タブで自動割当を実行してください。'
+  };
 }
 
 // ===== レビュー用機能 =====
