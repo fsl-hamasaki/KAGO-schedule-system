@@ -185,7 +185,8 @@
       </div>
       <p style="font-size:0.82rem; color:#5f6368; margin-bottom:14px;">
         担当する手入力カテゴリの学校（左サイドバー）をカレンダーにドラッグして、翌月の支援予定を組みます。
-        他の支援員の予定は閲覧のみです。<strong>未保存の変更は破線枠</strong>で表示され、「保存」ボタンを押すまでサーバには反映されません。
+        他の支援員の予定は閲覧のみです。<br>
+        <span style="display:inline-block; padding:1px 6px; background:#e8eaed; color:#5f6368; border:1px solid #bdc1c6; border-radius:4px; font-size:0.7rem; margin-right:4px;">確</span>マーク付きの灰色枠は<strong>確定済み（要望由来）</strong>のスケジュール（読み取り専用）。<strong>未保存の手入力変更は破線枠</strong>で表示され、「保存」ボタンを押すまでサーバには反映されません。
       </p>
 
       <div style="display:flex; gap:14px; align-items:flex-start;">
@@ -278,6 +279,7 @@
   var manualSchedules = JSON.parse(<?!= JSON.stringify(manualSchedules) ?>);
   var manualSchools = JSON.parse(<?!= JSON.stringify(manualSchools) ?>);
   var myManualSchools = JSON.parse(<?!= JSON.stringify(myManualSchools) ?>);
+  var myAllConfirmedSchedule = JSON.parse(<?!= JSON.stringify(myAllConfirmedSchedule) ?>);
 
   // 祝日
   var JP_HOLIDAYS = {
@@ -812,6 +814,15 @@
       if (!byDate[s.date]) byDate[s.date] = [];
       byDate[s.date].push(s);
     }
+    // 確定スケジュール（要望由来・読み取り専用）を日付別にまとめる
+    var confirmedByDate = {};
+    for (var i = 0; i < myAllConfirmedSchedule.length; i++) {
+      var c = myAllConfirmedSchedule[i];
+      if (!c.date) continue;
+      if (c.date.substring(0, 7) !== monthKey) continue;
+      if (!confirmedByDate[c.date]) confirmedByDate[c.date] = [];
+      confirmedByDate[c.date].push(c);
+    }
 
     var html = '<table style="width:100%; border-collapse:collapse; table-layout:fixed; min-width:720px;">';
     html += '<thead><tr>';
@@ -828,14 +839,28 @@
       for (var d = 0; d < 7; d++) {
         var cellIdx = w * 7 + d;
         if (cellIdx < firstDow || dayNum > lastDay) {
-          html += '<td style="border:1px solid #dadce0; background:#fafafa; height:80px;"></td>';
+          html += '<td style="border:1px solid #dadce0; background:#fafafa; height:90px;"></td>';
         } else {
           var dateStr = y + '-' + String(m).padStart(2,'0') + '-' + String(dayNum).padStart(2,'0');
           var isHoliday = JP_HOLIDAYS[dateStr];
           var entries = byDate[dateStr] || [];
+          var confirmedEntries = confirmedByDate[dateStr] || [];
           var bg = (d === 0 || d === 6 || isHoliday) ? '#fafafa' : '#fff';
-          html += '<td style="border:1px solid #dadce0; vertical-align:top; padding:4px; height:80px; background:' + bg + ';" ondragover="onManualDragOver(event)" ondrop="onManualDrop(event, \'' + dateStr + '\')">';
+          html += '<td style="border:1px solid #dadce0; vertical-align:top; padding:4px; height:90px; background:' + bg + ';" ondragover="onManualDragOver(event)" ondrop="onManualDrop(event, \'' + dateStr + '\')">';
           html += '<div style="font-size:0.72rem; color:#5f6368; margin-bottom:2px;">' + dayNum + (isHoliday ? '<span style="color:#d93025; margin-left:3px;">祝</span>' : '') + '</div>';
+          // 確定スケジュール（読み取り専用、薄いグレー背景）を先に表示
+          for (var ci = 0; ci < confirmedEntries.length; ci++) {
+            var c = confirmedEntries[ci];
+            var isSub = (c.origStaff && c.origStaff !== myStaffName);
+            var bgC = isSub ? '#fef7e0' : '#e8eaed';
+            var fgC = isSub ? '#b06000' : '#5f6368';
+            var brC = isSub ? '#f9ab00' : '#bdc1c6';
+            html += '<div style="background:' + bgC + '; color:' + fgC + '; font-size:0.68rem; padding:1px 5px; border-radius:4px; margin-bottom:2px; cursor:default; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border:1px solid ' + brC + ';" title="' + esc('確定: ' + c.schoolName + ' / ' + c.timeSlot + (isSub ? '（代' + c.origStaff + '）' : '')) + '">';
+            html += '<span style="margin-right:3px;">確</span>';
+            html += esc(c.schoolName) + '<span style="opacity:0.7; margin-left:3px;">' + esc(c.timeSlot) + '</span>';
+            html += '</div>';
+          }
+          // 手入力エントリ（編集可）
           for (var ei = 0; ei < entries.length; ei++) {
             var e = entries[ei];
             var isMine = (e.staffName === myStaffName);

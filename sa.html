@@ -574,7 +574,8 @@
           <span class="message" id="manualMsg" style="margin:0;"></span>
         </div>
         <p style="font-size:0.82rem; color:#5f6368; margin-bottom:10px;">
-          学校カードをカレンダーにドラッグして予定を組みます。<strong>未保存の変更は破線枠</strong>で表示され、「保存」ボタンを押すまでサーバには反映されません。
+          学校カードをカレンダーにドラッグして予定を組みます。<br>
+          <span style="display:inline-block; padding:1px 6px; background:#fff; color:#5f6368; border:1px solid #9aa0a6; border-radius:4px; font-size:0.7rem; margin-right:4px;">確</span>マーク付きの白枠は<strong>確定済み（要望由来）</strong>のスケジュール（読み取り専用、支援員カラーで縁取り）。<strong>未保存の手入力変更は破線枠</strong>で表示され、「保存」ボタンを押すまでサーバには反映されません。
         </p>
 
         <div style="display:flex; gap:14px; align-items:flex-start;">
@@ -923,6 +924,7 @@
   var accountList = JSON.parse(<?!= JSON.stringify(accountList) ?>);
   var manualSchedules = JSON.parse(<?!= JSON.stringify(manualSchedules) ?>);
   var manualSchools = JSON.parse(<?!= JSON.stringify(manualSchools) ?>);
+  var allConfirmedSchedule = JSON.parse(<?!= JSON.stringify(allConfirmedSchedule) ?>);
   var baseUrl = <?!= JSON.stringify(baseUrl) ?>;
   var MANUAL_CAN_EDIT_ALL = true; // SA画面では全員分編集可
 
@@ -2445,6 +2447,15 @@
       if (!byDate[s.date]) byDate[s.date] = [];
       byDate[s.date].push(s);
     }
+    // 確定スケジュール（全員分、読み取り専用）
+    var confirmedByDate = {};
+    for (var i = 0; i < allConfirmedSchedule.length; i++) {
+      var c = allConfirmedSchedule[i];
+      if (!c.date) continue;
+      if (c.date.substring(0, 7) !== monthKey) continue;
+      if (!confirmedByDate[c.date]) confirmedByDate[c.date] = [];
+      confirmedByDate[c.date].push(c);
+    }
 
     var html = '<table style="width:100%; border-collapse:collapse; table-layout:fixed; min-width:720px;">';
     html += '<thead><tr>';
@@ -2461,14 +2472,25 @@
       for (var d = 0; d < 7; d++) {
         var cellIdx = w * 7 + d;
         if (cellIdx < firstDow || dayNum > lastDay) {
-          html += '<td style="border:1px solid #dadce0; background:#fafafa; height:84px;"></td>';
+          html += '<td style="border:1px solid #dadce0; background:#fafafa; height:108px;"></td>';
         } else {
           var dateStr = y + '-' + String(m).padStart(2,'0') + '-' + String(dayNum).padStart(2,'0');
           var isHoliday = JP_HOLIDAYS[dateStr];
           var entries = byDate[dateStr] || [];
+          var confirmedEntries = confirmedByDate[dateStr] || [];
           var bg = (d === 0 || d === 6 || isHoliday) ? '#fafafa' : '#fff';
-          html += '<td style="border:1px solid #dadce0; vertical-align:top; padding:4px; height:84px; background:' + bg + ';" ondragover="onManualDragOver(event)" ondrop="onManualDrop(event, \'' + dateStr + '\')">';
+          html += '<td style="border:1px solid #dadce0; vertical-align:top; padding:4px; height:108px; background:' + bg + ';" ondragover="onManualDragOver(event)" ondrop="onManualDrop(event, \'' + dateStr + '\')">';
           html += '<div style="font-size:0.72rem; color:#5f6368; margin-bottom:2px;">' + dayNum + (isHoliday ? '<span style="color:#d93025; margin-left:3px;">祝</span>' : '') + '</div>';
+          // 確定スケジュール（読み取り専用、支援員カラーを薄めて表示）
+          for (var ci = 0; ci < confirmedEntries.length; ci++) {
+            var c = confirmedEntries[ci];
+            var staffColor = STAFF_COLORS[c.staffName] || '#9aa0a6';
+            html += '<div style="background:#fff; color:' + staffColor + '; font-size:0.66rem; padding:1px 5px; border-radius:4px; margin-bottom:2px; cursor:default; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; border:1px solid ' + staffColor + ';" title="' + esc('確定: ' + c.schoolName + ' / ' + c.staffName + ' / ' + c.timeSlot) + '">';
+            html += '<span style="margin-right:3px;">確</span>';
+            html += esc(c.schoolName) + '<span style="opacity:0.75; margin-left:3px;">' + esc(c.timeSlot) + '</span>';
+            html += '</div>';
+          }
+          // 手入力エントリ
           for (var ei = 0; ei < entries.length; ei++) {
             var e = entries[ei];
             var color = STAFF_COLORS[e.staffName] || (e.supportType === 'オンライン' ? '#34a853' : '#1a73e8');

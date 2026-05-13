@@ -168,6 +168,8 @@ function serveSA_(email, settings, baseUrl) {
   template.accountList = JSON.stringify(getAccountList_());
   template.manualSchedules = JSON.stringify(getManualSchedules_(settings.targetMonth));
   template.manualSchools = JSON.stringify(getManualScopedSchools());
+  // 全期間の確定スケジュール（手入力カレンダー & 統合スケジュールの月切替対応用）
+  template.allConfirmedSchedule = JSON.stringify(getSchedule_(null).filter(function(s) { return s.status === '確定'; }));
   template.baseUrl = baseUrl;
   return template.evaluate()
     .setTitle('SA管理画面 - FSL鹿児島県ICT支援スケジュールシステム')
@@ -194,12 +196,20 @@ function serveStaff_(email, settings, baseUrl) {
   // 自分が担当する手入力校
   var myStaffName = staffScheduleInfo.staffName;
   var myManualSchools = allManualSchools.filter(function(s) { return s.staffName === myStaffName; });
+  // 全期間の確定スケジュール（自分の分、月切替対応用）
+  var myAllConfirmed = [];
+  if (myStaffName) {
+    myAllConfirmed = getSchedule_(null).filter(function(s) {
+      return s.status === '確定' && (s.staffName === myStaffName || s.origStaff === myStaffName);
+    });
+  }
 
   var template = HtmlService.createTemplateFromFile('staff');
   template.email = email;
   template.settings = JSON.stringify(settings);
   template.candidates = JSON.stringify(candidates);
   template.mySchedule = JSON.stringify(staffScheduleInfo.schedule);
+  template.myAllConfirmedSchedule = JSON.stringify(myAllConfirmed);
   template.myStaffName = myStaffName;
   template.holidays = JSON.stringify(holidays);
   template.meetings = JSON.stringify(meetings);
