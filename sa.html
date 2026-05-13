@@ -458,6 +458,7 @@
     <a class="active" onclick="switchTab('dashboard', this)">ダッシュボード</a>
     <a onclick="switchTab('schedule', this)">スケジュール管理</a>
     <a onclick="switchTab('manual', this)">手入力スケジュール</a>
+    <a onclick="switchTab('integrated', this)">統合スケジュール</a>
     <a onclick="switchTab('settings', this)">システム設定</a>
     <a onclick="switchTab('holidays', this)">休日設定</a>
     <a onclick="switchTab('users', this)">登録ユーザー</a>
@@ -476,6 +477,9 @@
       </a>
       <a onclick="switchTab('manual', this)">
         <span class="nav-icon">&#9999;</span> 手入力スケジュール
+      </a>
+      <a onclick="switchTab('integrated', this)">
+        <span class="nav-icon">&#9728;</span> 統合スケジュール
       </a>
       <a onclick="switchTab('settings', this)">
         <span class="nav-icon">&#9881;</span> システム設定
@@ -563,8 +567,15 @@
           <span id="manualMonthLabel" style="font-size:1.05rem; font-weight:700; min-width:120px; text-align:center;"></span>
           <button class="btn btn-outline" onclick="changeManualMonth(1)">翌月 &#9654;</button>
           <button class="btn btn-outline" style="margin-left:14px;" onclick="runManualSample()">サンプル投入</button>
+          <span style="flex:1;"></span>
+          <span id="manualDraftBadge" style="display:none; padding:4px 10px; background:#fff8e1; color:#b06000; border:1px solid #f9ab00; border-radius:20px; font-size:0.78rem; font-weight:600;"></span>
+          <button class="btn btn-primary" id="manualSaveBtn" onclick="commitManualDraft()" disabled>保存</button>
+          <button class="btn btn-outline" id="manualCancelBtn" onclick="discardManualDraft()" disabled style="color:#5f6368; border-color:#dadce0;">キャンセル</button>
           <span class="message" id="manualMsg" style="margin:0;"></span>
         </div>
+        <p style="font-size:0.82rem; color:#5f6368; margin-bottom:10px;">
+          学校カードをカレンダーにドラッグして予定を組みます。<strong>未保存の変更は破線枠</strong>で表示され、「保存」ボタンを押すまでサーバには反映されません。
+        </p>
 
         <div style="display:flex; gap:14px; align-items:flex-start;">
           <!-- 学校サイドバー -->
@@ -599,11 +610,21 @@
             <div style="margin-bottom:14px;">
               <div style="font-size:0.78rem; color:#5f6368; margin-bottom:3px;">時間帯</div>
               <div id="manualVisitTimeBlock">
-                <select id="manualDialogTime" style="width:100%; padding:6px 8px; border:1.5px solid #dadce0; border-radius:6px;">
+                <select id="manualDialogTime" onchange="onManualPresetChange()" style="width:100%; padding:6px 8px; border:1.5px solid #dadce0; border-radius:6px;">
                   <option value="09:00-12:00">AM（09:00-12:00）</option>
+                  <option value="09:30-12:30">09:30-12:30</option>
+                  <option value="13:00-16:00">13:00-16:00</option>
                   <option value="13:30-16:30">PM（13:30-16:30）</option>
                   <option value="09:00-16:00">終日（09:00-16:00）</option>
+                  <option value="__custom__">その他（時刻を指定）...</option>
                 </select>
+                <div id="manualCustomTimeBlock" style="display:none; margin-top:6px;">
+                  <div style="display:flex; align-items:center; gap:6px;">
+                    <input type="time" id="manualCustomStart" value="10:00" style="padding:5px 8px; border:1.5px solid #dadce0; border-radius:6px;">
+                    <span>〜</span>
+                    <input type="time" id="manualCustomEnd" value="11:00" style="padding:5px 8px; border:1.5px solid #dadce0; border-radius:6px;">
+                  </div>
+                </div>
               </div>
               <div id="manualOnlineTimeBlock" style="display:none;">
                 <div style="display:flex; align-items:center; gap:6px;">
@@ -619,6 +640,34 @@
               <button class="btn btn-primary" onclick="saveManualEntry()">保存</button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Tab: 統合スケジュール -->
+      <div class="tab-content" id="tab-integrated">
+        <h2 class="page-title">統合スケジュール</h2>
+        <p class="page-subtitle">要望スケジュール（確定/仮）と手入力スケジュールを支援員ごとに色分けして表示します</p>
+
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px;">
+          <button class="btn btn-outline" onclick="changeIntegratedMonth(-1)">&#9664; 前月</button>
+          <span id="integratedMonthLabel" style="font-size:1.05rem; font-weight:700; min-width:120px; text-align:center;"></span>
+          <button class="btn btn-outline" onclick="changeIntegratedMonth(1)">翌月 &#9654;</button>
+        </div>
+
+        <!-- 凡例（支援員カラー + ソース記号） -->
+        <div id="integratedLegend" style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; padding:10px 12px; background:#f8f9fa; border-radius:8px; font-size:0.8rem;"></div>
+
+        <!-- 上: 全体カレンダー -->
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-title">全体カレンダー（全員分）</div>
+          <div id="integratedAllCalendar"></div>
+        </div>
+
+        <!-- 下: 支援員別カード + 個別カレンダー -->
+        <div class="card">
+          <div class="card-title">支援員別カレンダー <span style="font-weight:400; color:#5f6368; font-size:0.78rem; margin-left:6px;">カードをクリックして個別カレンダーを表示</span></div>
+          <div id="integratedStaffCards" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; margin-bottom:14px;"></div>
+          <div id="integratedStaffDetail"></div>
         </div>
       </div>
 
@@ -939,6 +988,11 @@
   // ===== タブ切替 =====
 
   function switchTab(tabId, clickedEl) {
+    // 「手入力」タブから離れる際、未保存変更があれば警告
+    var curManualActive = document.getElementById('tab-manual') && document.getElementById('tab-manual').classList.contains('active');
+    if (curManualActive && tabId !== 'manual' && typeof manualDraftHasChanges === 'function' && manualDraftHasChanges()) {
+      if (!confirm('未保存の手入力スケジュールがあります。タブを切り替えるとローカルでは残りますが、まだサーバには反映されません。よろしいですか？')) return;
+    }
     // タブコンテンツ切替
     var tabs = document.querySelectorAll('.tab-content');
     for (var i = 0; i < tabs.length; i++) tabs[i].classList.remove('active');
@@ -958,7 +1012,7 @@
     }
 
     // 両方のナビを同期（tabIdで対応するリンクを探す）
-    var tabMap = { 'dashboard': 0, 'schedule': 1, 'manual': 2, 'settings': 3, 'holidays': 4, 'users': 5, 'review': 6 };
+    var tabMap = { 'dashboard': 0, 'schedule': 1, 'manual': 2, 'integrated': 3, 'settings': 4, 'holidays': 5, 'users': 6, 'review': 7 };
     var idx = tabMap[tabId];
     if (idx !== undefined) {
       if (sideLinks[idx]) sideLinks[idx].classList.add('active');
@@ -968,6 +1022,9 @@
     // 手入力タブが初表示の場合、カレンダーを描画
     if (tabId === 'manual') {
       renderManualUI();
+    }
+    if (tabId === 'integrated') {
+      renderIntegratedUI();
     }
   }
 
@@ -2244,9 +2301,26 @@
   // ============================================
   var manualState = {
     year: null, month: null,
-    editing: null,   // { id, ... } 編集対象、null なら新規
-    draft: null      // 新規時のサイドバーからの D&D 情報
+    draft: null      // ダイアログ表示中の編集状態（編集 or 新規）
   };
+  var manualDraft = {
+    adds: [],          // [{ tempId, date, staffName, schoolName, ... }]
+    updates: {},       // { id: { ...変更後フィールド } }
+    deletes: {}        // { id: true }
+  };
+  function manualDraftHasChanges() {
+    if (manualDraft.adds.length > 0) return true;
+    for (var k in manualDraft.updates) { if (manualDraft.updates.hasOwnProperty(k)) return true; }
+    for (var k in manualDraft.deletes) { if (manualDraft.deletes.hasOwnProperty(k)) return true; }
+    return false;
+  }
+  function manualDraftClear() {
+    manualDraft.adds = []; manualDraft.updates = {}; manualDraft.deletes = {};
+    refreshDraftIndicator();
+  }
+  window.addEventListener('beforeunload', function(e) {
+    if (manualDraftHasChanges()) { e.preventDefault(); e.returnValue = ''; return ''; }
+  });
 
   function initManualState() {
     if (manualState.year && manualState.month) return;
@@ -2294,6 +2368,26 @@
     document.getElementById('manualMonthLabel').textContent = manualState.year + '年' + manualState.month + '月';
     renderManualSidebar();
     renderManualCalendar();
+    refreshDraftIndicator();
+  }
+
+  function applyManualDraftToBase() {
+    var result = [];
+    for (var i = 0; i < manualSchedules.length; i++) {
+      var b = manualSchedules[i];
+      if (manualDraft.deletes[b.id]) continue;
+      var copy = {}; for (var k in b) copy[k] = b[k];
+      var u = manualDraft.updates[b.id];
+      if (u) { for (var k in u) copy[k] = u[k]; copy._draftOp = 'update'; }
+      result.push(copy);
+    }
+    for (var i = 0; i < manualDraft.adds.length; i++) {
+      var a = manualDraft.adds[i];
+      var copy = {}; for (var k in a) copy[k] = a[k];
+      copy.id = a.tempId; copy._draftOp = 'add';
+      result.push(copy);
+    }
+    return result;
   }
 
   function renderManualSidebar() {
@@ -2337,9 +2431,10 @@
     var lastDay = new Date(y, m, 0).getDate();
     var monthKey = getManualMonthKey();
 
+    var displayList = applyManualDraftToBase();
     var byDate = {};
-    for (var i = 0; i < manualSchedules.length; i++) {
-      var s = manualSchedules[i];
+    for (var i = 0; i < displayList.length; i++) {
+      var s = displayList[i];
       if (s.targetMonth !== monthKey) continue;
       if (!byDate[s.date]) byDate[s.date] = [];
       byDate[s.date].push(s);
@@ -2370,8 +2465,12 @@
           html += '<div style="font-size:0.72rem; color:#5f6368; margin-bottom:2px;">' + dayNum + (isHoliday ? '<span style="color:#d93025; margin-left:3px;">祝</span>' : '') + '</div>';
           for (var ei = 0; ei < entries.length; ei++) {
             var e = entries[ei];
-            var color = e.supportType === 'オンライン' ? '#34a853' : '#1a73e8';
-            html += '<div onclick="editManualEntry(\'' + esc(e.id) + '\')" style="background:' + color + '; color:#fff; font-size:0.7rem; padding:2px 5px; border-radius:4px; margin-bottom:2px; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(e.schoolName + ' / ' + e.staffName + ' / ' + e.timeSlot) + '">';
+            var color = STAFF_COLORS[e.staffName] || (e.supportType === 'オンライン' ? '#34a853' : '#1a73e8');
+            var draftMark = '', extraStyle = '';
+            if (e._draftOp === 'add')    { draftMark = '★'; extraStyle = ' border:2px dashed #ffd54f;'; }
+            if (e._draftOp === 'update') { draftMark = '✎'; extraStyle = ' border:2px dashed #ffd54f;'; }
+            html += '<div onclick="editManualEntry(\'' + esc(e.id) + '\')" style="background:' + color + '; color:#fff; font-size:0.7rem; padding:2px 5px; border-radius:4px; margin-bottom:2px; cursor:pointer; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;' + extraStyle + '" title="' + esc(e.schoolName + ' / ' + e.staffName + ' / ' + e.timeSlot) + (e._draftOp ? '（未保存）' : '') + '">';
+            if (draftMark) html += '<span style="margin-right:3px;">' + draftMark + '</span>';
             html += esc(e.schoolName) + '<span style="opacity:0.7; margin-left:3px;">' + esc(e.timeSlot) + '</span>';
             html += '</div>';
           }
@@ -2384,6 +2483,20 @@
     html += '</tbody></table>';
     cont.innerHTML = html;
   }
+
+  // 支援員ごとの色マッピング（統合スケジュールでも使用）
+  var STAFF_COLORS = {
+    '水元 理恵子': '#1a73e8',
+    '山崎 混平':   '#34a853',
+    '村永 浩':     '#fbbc04',
+    '鈴木 亮':     '#ea4335',
+    '谷口 涼子':   '#9334e6',
+    '橋口 大地':   '#00897b',
+    '谷川 麗華':   '#e8710a',
+    '拔迫 大地':   '#673ab7',
+    '中根 秀幸':   '#0097a7',
+    '三池 博孝':   '#5f6368'
+  };
 
   function onManualDragStart(e) {
     var d = e.currentTarget;
@@ -2404,7 +2517,7 @@
     try {
       var payload = JSON.parse(raw);
       openManualDialog({
-        editing: null,
+        editKind: 'new',
         date: dateStr,
         schoolName: payload.schoolName,
         staffName:  payload.staffName,
@@ -2415,60 +2528,73 @@
     } catch (err) { /* noop */ }
   }
 
-  function editManualEntry(id) {
-    var entry = null;
-    for (var i = 0; i < manualSchedules.length; i++) {
-      if (manualSchedules[i].id === id) { entry = manualSchedules[i]; break; }
+  function findManualEntryById_(id) {
+    for (var i = 0; i < manualDraft.adds.length; i++) {
+      if (manualDraft.adds[i].tempId === id) return { kind: 'add', entry: manualDraft.adds[i] };
     }
-    if (!entry) return;
+    for (var i = 0; i < manualSchedules.length; i++) {
+      if (manualSchedules[i].id === id) {
+        var base = manualSchedules[i];
+        var u = manualDraft.updates[id] || {};
+        var merged = {}; for (var k in base) merged[k] = base[k];
+        for (var k in u) merged[k] = u[k];
+        return { kind: 'existing', baseEntry: base, mergedEntry: merged };
+      }
+    }
+    return null;
+  }
+
+  function editManualEntry(id) {
+    var f = findManualEntryById_(id);
+    if (!f) return;
+    var e = (f.kind === 'add') ? f.entry : f.mergedEntry;
     openManualDialog({
-      editing: entry,
-      date: entry.date,
-      schoolName: entry.schoolName,
-      staffName: entry.staffName,
-      municipality: entry.municipality,
-      timeSlot: entry.timeSlot,
-      supportType: entry.supportType
+      editKind: (f.kind === 'add') ? 'editAdd' : 'editExisting',
+      tempId: (f.kind === 'add') ? f.entry.tempId : null,
+      editingId: (f.kind === 'existing') ? f.baseEntry.id : null,
+      date: e.date, schoolName: e.schoolName, staffName: e.staffName,
+      municipality: e.municipality, timeSlot: e.timeSlot, supportType: e.supportType
     });
   }
 
+  var PRESET_TIME_SLOTS = ['09:00-12:00','09:30-12:30','13:00-16:00','13:30-16:30','09:00-16:00'];
+
   function openManualDialog(opts) {
-    manualState.editing = opts.editing;
     manualState.draft = opts;
-    document.getElementById('manualDialogTitle').textContent = opts.editing ? '手入力予定の編集' : '手入力予定の追加';
+    var isEdit = (opts.editKind === 'editAdd' || opts.editKind === 'editExisting');
+    document.getElementById('manualDialogTitle').textContent = isEdit ? '手入力予定の編集' : '手入力予定の追加';
     document.getElementById('manualDialogSchool').textContent = opts.schoolName + '（' + (opts.municipality || '') + '）';
     document.getElementById('manualDialogStaff').textContent = opts.staffName;
     document.getElementById('manualDialogDate').value = opts.date || '';
-    // 支援種別
     var typeRadios = document.querySelectorAll('input[name="manualType"]');
     for (var i = 0; i < typeRadios.length; i++) {
       typeRadios[i].checked = (typeRadios[i].value === (opts.supportType || '訪問'));
     }
     onManualTypeChange();
-    // 時間帯
     if (opts.supportType === 'オンライン') {
       var parts = String(opts.timeSlot || '10:00-11:00').split('-');
       document.getElementById('manualOnlineStart').value = parts[0] || '10:00';
       document.getElementById('manualOnlineEnd').value   = parts[1] || '11:00';
     } else {
       var sel = document.getElementById('manualDialogTime');
-      sel.value = opts.timeSlot || '09:00-12:00';
-      // 既存値がリストに無ければ追加
-      var found = false;
-      for (var k = 0; k < sel.options.length; k++) if (sel.options[k].value === sel.value) { found = true; break; }
-      if (!found) {
-        var op = document.createElement('option'); op.value = opts.timeSlot; op.textContent = opts.timeSlot; sel.appendChild(op);
-        sel.value = opts.timeSlot;
+      var ts = opts.timeSlot || '09:00-12:00';
+      if (PRESET_TIME_SLOTS.indexOf(ts) !== -1) {
+        sel.value = ts;
+        document.getElementById('manualCustomTimeBlock').style.display = 'none';
+      } else {
+        sel.value = '__custom__';
+        document.getElementById('manualCustomTimeBlock').style.display = 'block';
+        var p = ts.split('-');
+        document.getElementById('manualCustomStart').value = p[0] || '10:00';
+        document.getElementById('manualCustomEnd').value   = p[1] || '11:00';
       }
     }
-    document.getElementById('manualDeleteBtn').style.display = opts.editing ? 'inline-block' : 'none';
-    var dlg = document.getElementById('manualEditDialog');
-    dlg.style.display = 'flex';
+    document.getElementById('manualDeleteBtn').style.display = isEdit ? 'inline-block' : 'none';
+    document.getElementById('manualEditDialog').style.display = 'flex';
   }
 
   function closeManualDialog() {
     document.getElementById('manualEditDialog').style.display = 'none';
-    manualState.editing = null;
     manualState.draft = null;
   }
 
@@ -2482,6 +2608,11 @@
     document.getElementById('manualOnlineTimeBlock').style.display = isOnline ? 'block' : 'none';
   }
 
+  function onManualPresetChange() {
+    var sel = document.getElementById('manualDialogTime');
+    document.getElementById('manualCustomTimeBlock').style.display = (sel.value === '__custom__') ? 'block' : 'none';
+  }
+
   function getDialogTimeSlot_() {
     var isOnline = false;
     var typeRadios = document.querySelectorAll('input[name="manualType"]');
@@ -2493,9 +2624,16 @@
       var e = document.getElementById('manualOnlineEnd').value;
       return { type: 'オンライン', timeSlot: s + '-' + e };
     }
-    return { type: '訪問', timeSlot: document.getElementById('manualDialogTime').value };
+    var sel = document.getElementById('manualDialogTime');
+    if (sel.value === '__custom__') {
+      var cs = document.getElementById('manualCustomStart').value;
+      var ce = document.getElementById('manualCustomEnd').value;
+      return { type: '訪問', timeSlot: cs + '-' + ce };
+    }
+    return { type: '訪問', timeSlot: sel.value };
   }
 
+  // ダイアログ内 保存 → ドラフトに積む
   function saveManualEntry() {
     var draft = manualState.draft;
     if (!draft) return;
@@ -2504,64 +2642,119 @@
     if (!date) { showManualMsg('日付を指定してください', 'error'); return; }
     var entry = {
       targetMonth: date.substring(0, 7),
-      date: date,
-      staffName: draft.staffName,
-      schoolName: draft.schoolName,
-      municipality: draft.municipality,
-      timeSlot: ts.timeSlot,
-      supportType: ts.type,
-      status: '仮'
+      date: date, staffName: draft.staffName, schoolName: draft.schoolName,
+      municipality: draft.municipality, timeSlot: ts.timeSlot, supportType: ts.type, status: '仮'
     };
-    if (manualState.editing) {
-      google.script.run
-        .withSuccessHandler(function(r) {
-          closeManualDialog();
-          if (r.success) {
-            showManualMsg('更新しました', 'success');
-            // 月切替の必要があれば対応
-            var mk = entry.targetMonth.split('-');
-            manualState.year = parseInt(mk[0],10); manualState.month = parseInt(mk[1],10);
-            reloadManualSchedules(function() { renderManualUI(); });
-          } else {
-            showManualMsg(r.message || '更新失敗', 'error');
-          }
-        })
-        .withFailureHandler(function(err) { showManualMsg(err.message, 'error'); })
-        .updateManualSchedule(manualState.editing.id, entry);
+    if (draft.editKind === 'editAdd' && draft.tempId) {
+      for (var i = 0; i < manualDraft.adds.length; i++) {
+        if (manualDraft.adds[i].tempId === draft.tempId) {
+          for (var k in entry) manualDraft.adds[i][k] = entry[k];
+          break;
+        }
+      }
+    } else if (draft.editKind === 'editExisting' && draft.editingId) {
+      manualDraft.updates[draft.editingId] = entry;
     } else {
-      google.script.run
-        .withSuccessHandler(function(r) {
-          closeManualDialog();
-          if (r.success) {
-            showManualMsg('追加しました', 'success');
-            var mk = entry.targetMonth.split('-');
-            manualState.year = parseInt(mk[0],10); manualState.month = parseInt(mk[1],10);
-            reloadManualSchedules(function() { renderManualUI(); });
-          } else {
-            showManualMsg(r.message || '追加失敗', 'error');
-          }
-        })
-        .withFailureHandler(function(err) { showManualMsg(err.message, 'error'); })
-        .addManualSchedule(entry);
+      entry.tempId = 't_' + Date.now() + '_' + Math.floor(Math.random()*10000);
+      entry._draftOp = 'add';
+      manualDraft.adds.push(entry);
     }
+    closeManualDialog();
+    var mk = date.split('-');
+    manualState.year = parseInt(mk[0],10); manualState.month = parseInt(mk[1],10);
+    renderManualUI();
   }
 
+  // ダイアログ内 削除 → ドラフトに積む
   function deleteManualEntry() {
-    if (!manualState.editing) return;
-    if (!confirm('この予定を削除しますか？')) return;
-    var id = manualState.editing.id;
-    google.script.run
-      .withSuccessHandler(function(r) {
-        closeManualDialog();
-        if (r.success) {
-          showManualMsg('削除しました', 'success');
-          reloadManualSchedules(function() { renderManualUI(); });
-        } else {
-          showManualMsg(r.message || '削除失敗', 'error');
-        }
-      })
-      .withFailureHandler(function(err) { showManualMsg(err.message, 'error'); })
-      .deleteManualSchedule(id);
+    var draft = manualState.draft;
+    if (!draft) return;
+    if (draft.editKind === 'editAdd' && draft.tempId) {
+      manualDraft.adds = manualDraft.adds.filter(function(a) { return a.tempId !== draft.tempId; });
+    } else if (draft.editingId) {
+      manualDraft.deletes[draft.editingId] = true;
+      delete manualDraft.updates[draft.editingId];
+    }
+    closeManualDialog();
+    renderManualUI();
+  }
+
+  // 一括保存
+  function commitManualDraft() {
+    if (!manualDraftHasChanges()) return;
+    var ops = [];
+    for (var id in manualDraft.deletes) if (manualDraft.deletes.hasOwnProperty(id)) ops.push({ kind: 'delete', id: id });
+    for (var id in manualDraft.updates) if (manualDraft.updates.hasOwnProperty(id)) ops.push({ kind: 'update', id: id, entry: manualDraft.updates[id] });
+    for (var i = 0; i < manualDraft.adds.length; i++) {
+      var a = manualDraft.adds[i];
+      var copy = {}; for (var k in a) if (k !== 'tempId' && k !== '_draftOp') copy[k] = a[k];
+      ops.push({ kind: 'add', entry: copy });
+    }
+    if (ops.length === 0) return;
+    document.getElementById('manualSaveBtn').disabled = true;
+    document.getElementById('manualCancelBtn').disabled = true;
+    showManualMsg('保存中... (' + ops.length + '件)', '');
+    var idx = 0, failures = [];
+    function nextOp() {
+      if (idx >= ops.length) { onDoneAll(); return; }
+      var op = ops[idx++];
+      var runner = google.script.run
+        .withSuccessHandler(function(r) {
+          if (!r || !r.success) failures.push(op.kind + ': ' + (r && r.message ? r.message : '失敗'));
+          nextOp();
+        })
+        .withFailureHandler(function(err) {
+          failures.push(op.kind + ': ' + (err && err.message ? err.message : '通信失敗'));
+          nextOp();
+        });
+      if (op.kind === 'delete')      runner.deleteManualSchedule(op.id);
+      else if (op.kind === 'update') runner.updateManualSchedule(op.id, op.entry);
+      else                            runner.addManualSchedule(op.entry);
+    }
+    function onDoneAll() {
+      if (failures.length === 0) {
+        showManualMsg(ops.length + '件 保存しました', 'success');
+        manualDraftClear();
+        reloadManualSchedules(function() { renderManualUI(); });
+      } else {
+        showManualMsg('一部失敗: ' + failures.slice(0,3).join(' / '), 'error');
+        reloadManualSchedules(function() { renderManualUI(); });
+      }
+    }
+    nextOp();
+  }
+
+  function discardManualDraft() {
+    if (!manualDraftHasChanges()) return;
+    if (!confirm('未保存の変更を破棄しますか？')) return;
+    manualDraftClear();
+    renderManualUI();
+  }
+
+  function refreshDraftIndicator() {
+    var add = manualDraft.adds.length;
+    var upd = 0; for (var k in manualDraft.updates) if (manualDraft.updates.hasOwnProperty(k)) upd++;
+    var del = 0; for (var k in manualDraft.deletes) if (manualDraft.deletes.hasOwnProperty(k)) del++;
+    var total = add + upd + del;
+    var badge = document.getElementById('manualDraftBadge');
+    var save = document.getElementById('manualSaveBtn');
+    var cancel = document.getElementById('manualCancelBtn');
+    if (total === 0) {
+      if (badge) badge.style.display = 'none';
+      if (save) save.disabled = true;
+      if (cancel) cancel.disabled = true;
+    } else {
+      if (badge) {
+        badge.style.display = 'inline-block';
+        var parts = [];
+        if (add) parts.push('追加' + add);
+        if (upd) parts.push('変更' + upd);
+        if (del) parts.push('削除' + del);
+        badge.textContent = '未保存 ' + parts.join(' ');
+      }
+      if (save) save.disabled = false;
+      if (cancel) cancel.disabled = false;
+    }
   }
 
   function runManualSample() {
@@ -2577,6 +2770,204 @@
       })
       .withFailureHandler(function(err) { showManualMsg(err.message, 'error'); })
       .setupSampleManualSchedule(getManualMonthKey());
+  }
+
+  // ============================================
+  // 統合スケジュールタブ
+  // ============================================
+  var integratedState = { year: null, month: null, selectedStaff: null };
+
+  function initIntegratedState() {
+    if (integratedState.year && integratedState.month) return;
+    var tm = (settings && settings.targetMonth) ? settings.targetMonth : '2026-06';
+    var p = tm.split('-');
+    integratedState.year = parseInt(p[0], 10);
+    integratedState.month = parseInt(p[1], 10);
+  }
+
+  function getIntegratedMonthKey() {
+    return integratedState.year + '-' + String(integratedState.month).padStart(2, '0');
+  }
+
+  function changeIntegratedMonth(delta) {
+    initIntegratedState();
+    integratedState.month += delta;
+    if (integratedState.month < 1)  { integratedState.month = 12; integratedState.year--; }
+    if (integratedState.month > 12) { integratedState.month = 1;  integratedState.year++; }
+    renderIntegratedUI();
+  }
+
+  // scheduleData (要望) + manualSchedules (手入力) を統合
+  function getIntegratedEntries(monthKey, staffFilter) {
+    var result = [];
+    for (var i = 0; i < scheduleData.length; i++) {
+      var s = scheduleData[i];
+      if (!s.date) continue;
+      if (s.date.substring(0, 7) !== monthKey) continue;
+      if (staffFilter && s.staffName !== staffFilter) continue;
+      result.push({
+        date: s.date, staffName: s.staffName, schoolName: s.schoolName,
+        timeSlot: s.timeSlot || '', supportType: s.supportType || '訪問',
+        status: s.status || '', source: '要望', rank: s.candidateRank || ''
+      });
+    }
+    for (var i = 0; i < manualSchedules.length; i++) {
+      var s = manualSchedules[i];
+      if (!s.date) continue;
+      if (s.date.substring(0, 7) !== monthKey) continue;
+      if (staffFilter && s.staffName !== staffFilter) continue;
+      result.push({
+        date: s.date, staffName: s.staffName, schoolName: s.schoolName,
+        timeSlot: s.timeSlot || '', supportType: s.supportType || '訪問',
+        status: s.status || '仮', source: '手入力', municipality: s.municipality || ''
+      });
+    }
+    return result;
+  }
+
+  function renderIntegratedUI() {
+    initIntegratedState();
+    document.getElementById('integratedMonthLabel').textContent = integratedState.year + '年' + integratedState.month + '月';
+    renderIntegratedLegend();
+    renderIntegratedAllCalendar();
+    renderIntegratedStaffCards();
+    if (integratedState.selectedStaff) {
+      renderIntegratedStaffDetail(integratedState.selectedStaff);
+    } else {
+      document.getElementById('integratedStaffDetail').innerHTML = '';
+    }
+  }
+
+  function renderIntegratedLegend() {
+    var html = '';
+    html += '<div style="display:flex; gap:14px; align-items:center; flex-wrap:wrap;">';
+    html += '<span style="font-weight:600; color:#5f6368;">ソース:</span>';
+    html += '<span><span style="display:inline-block; padding:1px 6px; background:#5f6368; color:#fff; border-radius:3px; margin-right:3px;">▲</span>要望</span>';
+    html += '<span><span style="display:inline-block; padding:1px 6px; background:#5f6368; color:#fff; border-radius:3px; margin-right:3px;">●</span>手入力</span>';
+    html += '</div>';
+    html += '<div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:6px;">';
+    html += '<span style="font-weight:600; color:#5f6368;">支援員:</span>';
+    for (var name in STAFF_COLORS) {
+      if (!STAFF_COLORS.hasOwnProperty(name)) continue;
+      html += '<span style="display:inline-flex; align-items:center; gap:4px;">';
+      html += '<span style="display:inline-block; width:12px; height:12px; border-radius:3px; background:' + STAFF_COLORS[name] + ';"></span>';
+      html += esc(name);
+      html += '</span>';
+    }
+    html += '</div>';
+    document.getElementById('integratedLegend').innerHTML = html;
+  }
+
+  function sourceMark_(source) {
+    return (source === '要望') ? '▲' : '●';
+  }
+
+  function renderIntegratedCalendarTable_(containerId, entries, year, month) {
+    var cont = document.getElementById(containerId);
+    var firstDow = new Date(year, month - 1, 1).getDay();
+    var lastDay = new Date(year, month, 0).getDate();
+
+    var byDate = {};
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (!byDate[e.date]) byDate[e.date] = [];
+      byDate[e.date].push(e);
+    }
+
+    var html = '<table style="width:100%; border-collapse:collapse; table-layout:fixed; min-width:760px;">';
+    html += '<thead><tr>';
+    var dows = ['日','月','火','水','木','金','土'];
+    for (var d = 0; d < 7; d++) {
+      var color = (d === 0) ? '#d93025' : (d === 6) ? '#1a73e8' : '#5f6368';
+      html += '<th style="padding:6px 4px; border:1px solid #dadce0; background:#f8f9fa; font-size:0.78rem; color:' + color + ';">' + dows[d] + '</th>';
+    }
+    html += '</tr></thead><tbody>';
+
+    var dayNum = 1;
+    for (var w = 0; w < 6 && dayNum <= lastDay; w++) {
+      html += '<tr>';
+      for (var d = 0; d < 7; d++) {
+        var cellIdx = w * 7 + d;
+        if (cellIdx < firstDow || dayNum > lastDay) {
+          html += '<td style="border:1px solid #dadce0; background:#fafafa; height:88px;"></td>';
+        } else {
+          var dateStr = year + '-' + String(month).padStart(2,'0') + '-' + String(dayNum).padStart(2,'0');
+          var isHoliday = JP_HOLIDAYS[dateStr];
+          var es = byDate[dateStr] || [];
+          var bg = (d === 0 || d === 6 || isHoliday) ? '#fafafa' : '#fff';
+          html += '<td style="border:1px solid #dadce0; vertical-align:top; padding:4px; height:88px; background:' + bg + ';">';
+          html += '<div style="font-size:0.72rem; color:#5f6368; margin-bottom:2px;">' + dayNum + (isHoliday ? '<span style="color:#d93025; margin-left:3px;">祝</span>' : '') + '</div>';
+          for (var ei = 0; ei < es.length; ei++) {
+            var e = es[ei];
+            var col = STAFF_COLORS[e.staffName] || '#9aa0a6';
+            var title = e.staffName + ' / ' + e.schoolName + ' / ' + e.timeSlot + ' / ' + e.source + (e.rank ? ' ' + e.rank : '') + (e.status ? ' [' + e.status + ']' : '');
+            html += '<div style="background:' + col + '; color:#fff; font-size:0.68rem; padding:2px 4px; border-radius:4px; margin-bottom:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="' + esc(title) + '">';
+            html += '<span style="margin-right:3px;">' + sourceMark_(e.source) + '</span>';
+            html += esc(e.schoolName);
+            html += '</div>';
+          }
+          html += '</td>';
+          dayNum++;
+        }
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    cont.innerHTML = html;
+  }
+
+  function renderIntegratedAllCalendar() {
+    var entries = getIntegratedEntries(getIntegratedMonthKey(), null);
+    renderIntegratedCalendarTable_('integratedAllCalendar', entries, integratedState.year, integratedState.month);
+  }
+
+  function renderIntegratedStaffCards() {
+    var monthKey = getIntegratedMonthKey();
+    var allEntries = getIntegratedEntries(monthKey, null);
+    var stats = {};
+    for (var name in STAFF_COLORS) if (STAFF_COLORS.hasOwnProperty(name)) stats[name] = { req: 0, manual: 0 };
+    for (var i = 0; i < allEntries.length; i++) {
+      var e = allEntries[i];
+      if (!stats[e.staffName]) stats[e.staffName] = { req: 0, manual: 0 };
+      if (e.source === '要望') stats[e.staffName].req++; else stats[e.staffName].manual++;
+    }
+    var html = '';
+    for (var name in stats) {
+      if (!stats.hasOwnProperty(name)) continue;
+      var color = STAFF_COLORS[name] || '#9aa0a6';
+      var st = stats[name];
+      var total = st.req + st.manual;
+      var sel = (integratedState.selectedStaff === name) ? ' outline:3px solid #1a73e8; outline-offset:-3px;' : '';
+      html += '<div onclick="selectIntegratedStaff(\'' + esc(name) + '\')" style="cursor:pointer; background:#fff; border:1px solid #e8eaed; border-left:6px solid ' + color + '; border-radius:8px; padding:10px 12px;' + sel + '">';
+      html += '<div style="font-weight:700; color:#202124; font-size:0.9rem;">' + esc(name) + '</div>';
+      html += '<div style="font-size:0.78rem; color:#5f6368; margin-top:4px;">合計 <strong style="color:#202124;">' + total + '</strong> 件　/　要望 ' + st.req + '　手入力 ' + st.manual + '</div>';
+      html += '</div>';
+    }
+    document.getElementById('integratedStaffCards').innerHTML = html;
+  }
+
+  function selectIntegratedStaff(name) {
+    if (integratedState.selectedStaff === name) {
+      integratedState.selectedStaff = null;
+      document.getElementById('integratedStaffDetail').innerHTML = '';
+    } else {
+      integratedState.selectedStaff = name;
+      renderIntegratedStaffDetail(name);
+    }
+    renderIntegratedStaffCards();
+  }
+
+  function renderIntegratedStaffDetail(staffName) {
+    var entries = getIntegratedEntries(getIntegratedMonthKey(), staffName);
+    var cont = document.getElementById('integratedStaffDetail');
+    var color = STAFF_COLORS[staffName] || '#9aa0a6';
+    var html = '';
+    html += '<div style="margin-top:10px; padding:12px; background:#fff; border:1px solid #e8eaed; border-left:6px solid ' + color + '; border-radius:8px;">';
+    html += '<div style="font-weight:700; color:#202124; font-size:1rem; margin-bottom:10px;">' + esc(staffName) + ' の月間カレンダー（' + entries.length + ' 件）</div>';
+    html += '<div id="integratedStaffCalendarInner"></div>';
+    html += '</div>';
+    cont.innerHTML = html;
+    renderIntegratedCalendarTable_('integratedStaffCalendarInner', entries, integratedState.year, integratedState.month);
   }
 </script>
 
