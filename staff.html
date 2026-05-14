@@ -521,7 +521,10 @@
           var isSubstitute = (entry.origStaff && entry.origStaff !== myStaffName && entry.staffName === myStaffName);
           var isOnline = entry.supportType === 'オンライン';
           var iconHtml = isOnline ? '<span style="margin-right:2px;">💻</span>' : '';
-          var titleAttr = entry.timeSlot ? entry.timeSlot + (isOnline ? ' (オンライン)' : '') : (isOnline ? 'オンライン' : '');
+          var titleParts = [];
+          if (entry.timeSlot) titleParts.push(entry.timeSlot);
+          if (isOnline) titleParts.push('オンライン' + (entry.remoteTool ? '（' + entry.remoteTool + '）' : ''));
+          var titleAttr = titleParts.join(' / ');
           var titleHtmlAttr = titleAttr ? ' title="' + esc(titleAttr) + '"' : '';
           var chipStyle = 'display:inline-block; padding:1px 5px; border-radius:3px; font-size:0.62rem; font-weight:600; margin:1px 0;';
           if (isDelegated) {

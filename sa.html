@@ -878,7 +878,8 @@
         </div>
         <div id="schedInfoArea" style="display:none; background:#f8f9fa; border-radius:8px; padding:12px 14px; margin-bottom:14px; font-size:0.82rem;">
           <div style="margin-bottom:4px;"><strong>割り当て状況：</strong><span id="schedRankLabel"></span></div>
-          <div><strong>ステータス：</strong><span id="schedStatusLabel"></span></div>
+          <div style="margin-bottom:4px;"><strong>ステータス：</strong><span id="schedStatusLabel"></span></div>
+          <div id="schedSupportTypeRow" style="display:none;"><strong>支援種別：</strong><span id="schedSupportTypeLabel"></span></div>
         </div>
         <div class="form-group">
           <label>支援員</label>
@@ -1134,12 +1135,18 @@
       }
       var secondInfo = '-';
       if (c.wantSecond) {
-        secondInfo = esc(c.supportType2 || '') + ' ' + esc(c.timeSlot2 || '');
+        var stype2Label = c.supportType2 === 'オンライン'
+          ? 'オンライン' + (c.remoteTool2 ? '（' + c.remoteTool2 + '）' : '')
+          : (c.supportType2 || '');
+        secondInfo = esc(stype2Label) + ' ' + esc(c.timeSlot2 || '');
       }
+      var stypeLabel = c.supportType === 'オンライン'
+        ? 'オンライン' + (c.remoteTool ? '（' + c.remoteTool + '）' : '')
+        : (c.supportType || '-');
       html += '<tr>' +
         '<td style="font-weight:600;">' + esc(c.schoolName) + '</td>' +
         '<td>' + esc(c.name) + '</td>' +
-        '<td>' + esc(c.supportType || '-') + '</td>' +
+        '<td>' + esc(stypeLabel) + '</td>' +
         '<td style="white-space:nowrap;">' + esc(c.timeSlot || '-') + '</td>' +
         '<td>' + fmtCandidate(c.v1c1) + '</td>' +
         '<td>' + fmtCandidate(c.v1c2) + '</td>' +
@@ -1865,7 +1872,7 @@
           var chipStaff = entry.staffName; // クリック時に使う支援員名
           var iconHtml = isOnline ? '<span class="online-icon">💻</span>' : '';
           var slotTitle = entry.timeSlot ? '\n' + entry.timeSlot : '';
-          var typeTitle = isOnline ? '\nオンライン支援' : '';
+          var typeTitle = isOnline ? ('\nオンライン支援' + (entry.remoteTool ? '（' + entry.remoteTool + '）' : '')) : '';
 
           if (entry.isDelegated) {
             // 代行チップ（元担当のカレンダーに表示）
@@ -1951,7 +1958,7 @@
           if (isOnline) chipCls += ' online';
           var iconHtml = isOnline ? '<span class="online-icon">💻</span>' : '';
           var slotTitle = entry.timeSlot ? '&#10;' + esc(entry.timeSlot) : '';
-          var typeTitle = isOnline ? '&#10;オンライン支援' : '';
+          var typeTitle = isOnline ? ('&#10;オンライン支援' + (entry.remoteTool ? '（' + esc(entry.remoteTool) + '）' : '')) : '';
 
           html += '<div class="' + chipCls + '" title="' + esc(entry.schoolName) + typeTitle + slotTitle + '&#10;' + esc(entry.staffName) + '&#10;' + esc(entry.candidateRank) + '"' +
             ' onclick="onScheduleChipClick(\'' + esc(ds) + '\',\'' + esc(entry.staffName) + '\',\'' + esc(entry.schoolName) + '\')">' +
@@ -2028,7 +2035,17 @@
       var entry = scheduleData.find(function(s) {
         return s.date === date && s.staffName === staffName && s.schoolName === schoolName;
       });
-      if (entry) alert(entry.schoolName + '\n' + entry.candidateRank + '\n' + entry.status + (entry.origStaff ? '\n元担当: ' + entry.origStaff : ''));
+      if (entry) {
+        var lines = [entry.schoolName, entry.candidateRank, entry.status];
+        if (entry.supportType === 'オンライン') {
+          lines.push('オンライン支援' + (entry.remoteTool ? '（' + entry.remoteTool + '）' : ''));
+        } else if (entry.supportType) {
+          lines.push(entry.supportType);
+        }
+        if (entry.timeSlot) lines.push('時間帯: ' + entry.timeSlot);
+        if (entry.origStaff) lines.push('元担当: ' + entry.origStaff);
+        alert(lines.join('\n'));
+      }
       return;
     }
     openSchedModal(schoolName, staffName, date, false);
@@ -2090,6 +2107,16 @@
         document.getElementById('schedRankLabel').textContent = entry.candidateRank +
           (entry.origStaff ? '（元担当: ' + entry.origStaff + '）' : '');
         document.getElementById('schedStatusLabel').textContent = entry.status;
+        var stRow = document.getElementById('schedSupportTypeRow');
+        if (entry.supportType) {
+          var stLabel = entry.supportType === 'オンライン'
+            ? 'オンライン' + (entry.remoteTool ? '（' + entry.remoteTool + '）' : '')
+            : entry.supportType;
+          document.getElementById('schedSupportTypeLabel').textContent = stLabel + (entry.timeSlot ? ' / ' + entry.timeSlot : '');
+          stRow.style.display = 'block';
+        } else {
+          stRow.style.display = 'none';
+        }
         infoArea.style.display = 'block';
       } else {
         infoArea.style.display = 'none';

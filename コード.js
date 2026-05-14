@@ -441,7 +441,8 @@ function submitCandidates(formData) {
     '2回目_第1候補', '2回目_第2候補', '2回目_第3候補',
     '備考', '送信日時', 'ICT支援要望',
     '1回目_第2希望時刻', '1回目_第3希望時刻',
-    '2回目_第2希望時刻', '2回目_第3希望時刻'
+    '2回目_第2希望時刻', '2回目_第3希望時刻',
+    'リモートツール', '2回目_リモートツール'
   ];
   var sheet = getOrCreateSheet_(SHEET_CANDIDATES, headers);
   ensureCandidateExtraColumns_(sheet);
@@ -477,7 +478,9 @@ function submitCandidates(formData) {
     formData.timeSlot1_2 || '',
     formData.timeSlot1_3 || '',
     formData.timeSlot2_2 || '',
-    formData.timeSlot2_3 || ''
+    formData.timeSlot2_3 || '',
+    formData.supportType === 'オンライン' ? (formData.remoteTool || 'Meet') : '',
+    formData.supportType2 === 'オンライン' ? (formData.remoteTool2 || 'Meet') : ''
   ];
 
   if (existingRow > 0) {
@@ -516,6 +519,8 @@ function getExistingCandidates_(email, targetMonth) {
         timeSlot1_3: String(data[i][19] == null ? '' : data[i][19]),
         timeSlot2_2: String(data[i][20] == null ? '' : data[i][20]),
         timeSlot2_3: String(data[i][21] == null ? '' : data[i][21]),
+        remoteTool: String(data[i][22] == null ? '' : data[i][22]),
+        remoteTool2: String(data[i][23] == null ? '' : data[i][23]),
         submittedAt: data[i][16] instanceof Date
           ? Utilities.formatDate(data[i][16], 'Asia/Tokyo', 'yyyy/MM/dd HH:mm')
           : ''
@@ -578,6 +583,8 @@ function getAllCandidates_(targetMonth) {
       timeSlot1_3: String(data[i][19] == null ? '' : data[i][19]),
       timeSlot2_2: String(data[i][20] == null ? '' : data[i][20]),
       timeSlot2_3: String(data[i][21] == null ? '' : data[i][21]),
+      remoteTool: String(data[i][22] == null ? '' : data[i][22]),
+      remoteTool2: String(data[i][23] == null ? '' : data[i][23]),
       submittedAt: data[i][16] instanceof Date
         ? Utilities.formatDate(data[i][16], 'Asia/Tokyo', 'yyyy/MM/dd HH:mm')
         : ''
@@ -597,6 +604,8 @@ function ensureCandidateExtraColumns_(sheet) {
   if (!have['1回目_第3希望時刻']) toAdd.push('1回目_第3希望時刻');
   if (!have['2回目_第2希望時刻']) toAdd.push('2回目_第2希望時刻');
   if (!have['2回目_第3希望時刻']) toAdd.push('2回目_第3希望時刻');
+  if (!have['リモートツール']) toAdd.push('リモートツール');
+  if (!have['2回目_リモートツール']) toAdd.push('2回目_リモートツール');
   if (toAdd.length === 0) return;
   sheet.getRange(1, lastCol + 1, 1, toAdd.length).setValues([toAdd]);
 }
@@ -2171,7 +2180,8 @@ function getSchedule_(targetMonth) {
       status: String(data[i][5]).trim(),
       origStaff: String(data[i][6] || '').trim(),
       timeSlot: String(data[i][7] == null ? '' : data[i][7]).trim(),
-      supportType: String(data[i][8] == null ? '' : data[i][8]).trim()
+      supportType: String(data[i][8] == null ? '' : data[i][8]).trim(),
+      remoteTool: String(data[i][9] == null ? '' : data[i][9]).trim()
     });
   }
   return results;
@@ -2179,11 +2189,14 @@ function getSchedule_(targetMonth) {
 
 function saveScheduleEntry(entry) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var headers = ['対象年月', '日付', '支援員名', '学校名', '候補順位', 'ステータス', '元担当支援員'];
+  var headers = ['対象年月', '日付', '支援員名', '学校名', '候補順位', 'ステータス', '元担当支援員', '時間帯', '支援種別', 'リモートツール'];
   var sheet = getOrCreateSheet_(SHEET_SCHEDULE, headers);
-  sheet.getRange(sheet.getLastRow() + 1, 1, 1, 7).setNumberFormat('@').setValues([[
+  ensureScheduleExtraColumns_(sheet);
+  sheet.getRange(sheet.getLastRow() + 1, 1, 1, 10).setNumberFormat('@').setValues([[
     entry.targetMonth, entry.date, entry.staffName, entry.schoolName,
-    entry.candidateRank || '', entry.status || '仮', entry.origStaff || ''
+    entry.candidateRank || '', entry.status || '仮', entry.origStaff || '',
+    entry.timeSlot || '', entry.supportType || '訪問',
+    entry.supportType === 'オンライン' ? (entry.remoteTool || 'Meet') : ''
   ]]);
   return { success: true };
 }
@@ -2385,7 +2398,7 @@ function markSlotUsed_(usedSlots, date, slotInfo) {
   }
 }
 
-// スケジュールシートに「時間帯」「支援種別」列が無ければ追加
+// スケジュールシートに「時間帯」「支援種別」「リモートツール」列が無ければ追加
 function ensureScheduleExtraColumns_(sheet) {
   var lastCol = sheet.getLastColumn();
   if (lastCol < 1) return;
@@ -2396,6 +2409,7 @@ function ensureScheduleExtraColumns_(sheet) {
   var toAdd = [];
   if (!have['時間帯']) toAdd.push('時間帯');
   if (!have['支援種別']) toAdd.push('支援種別');
+  if (!have['リモートツール']) toAdd.push('リモートツール');
 
   for (var i = 0; i < toAdd.length; i++) {
     var col = sheet.getLastColumn() + 1;
@@ -2503,6 +2517,7 @@ function autoAssignSchedule() {
       visitNum: 1,
       pairs: v1Pairs,
       supportType: stype1,
+      remoteTool: stype1 === 'オンライン' ? (c.remoteTool || 'Meet') : '',
       // フォールバック検索用（第1希望の slotInfo / timeSlot を使用）
       fallbackSlotInfo: getSlotInfo_(stype1, v1Slots[0]),
       fallbackTimeSlot: v1Slots[0],
@@ -2523,6 +2538,7 @@ function autoAssignSchedule() {
         visitNum: 2,
         pairs: v2Pairs,
         supportType: stype2,
+        remoteTool: stype2 === 'オンライン' ? (c.remoteTool2 || 'Meet') : '',
         fallbackSlotInfo: getSlotInfo_(stype2, v2Slots[0]),
         fallbackTimeSlot: v2Slots[0],
         staff: v2Staff,
@@ -2614,7 +2630,8 @@ function autoAssignSchedule() {
     if (!assignmentsBySchool[req.schoolName]) assignmentsBySchool[req.schoolName] = [];
     assignmentsBySchool[req.schoolName].push({
       visitNum: 1, date: result.date, rank: result.rank,
-      staff: req.staff, supportType: req.supportType, timeSlot: result.timeSlot
+      staff: req.staff, supportType: req.supportType, timeSlot: result.timeSlot,
+      remoteTool: req.remoteTool || ''
     });
 
     if (result.rank.indexOf('第1') === -1 && result.rank !== '割当不可' && result.rank.indexOf('自動割当') === -1) {
@@ -2634,7 +2651,8 @@ function autoAssignSchedule() {
     if (!assignmentsBySchool[req.schoolName]) assignmentsBySchool[req.schoolName] = [];
     assignmentsBySchool[req.schoolName].push({
       visitNum: 2, date: result.date, rank: result.rank,
-      staff: req.staff, supportType: req.supportType, timeSlot: result.timeSlot
+      staff: req.staff, supportType: req.supportType, timeSlot: result.timeSlot,
+      remoteTool: req.remoteTool || ''
     });
 
     if (result.rank.indexOf('第1') === -1 && result.rank !== '割当不可' && result.rank.indexOf('自動割当') === -1) {
@@ -2653,13 +2671,14 @@ function autoAssignSchedule() {
         a.visitNum + '回目 ' + a.rank,
         '仮', '',
         a.timeSlot || '',
-        a.supportType || '訪問'
+        a.supportType || '訪問',
+        a.supportType === 'オンライン' ? (a.remoteTool || 'Meet') : ''
       ]);
     }
   }
 
   // --- 6. スケジュールシートに書き込み ---
-  var headers = ['対象年月', '日付', '支援員名', '学校名', '候補順位', 'ステータス', '元担当支援員', '時間帯', '支援種別'];
+  var headers = ['対象年月', '日付', '支援員名', '学校名', '候補順位', 'ステータス', '元担当支援員', '時間帯', '支援種別', 'リモートツール'];
   var sheet = getOrCreateSheet_(SHEET_SCHEDULE, headers);
   ensureScheduleExtraColumns_(sheet);
 
@@ -2674,7 +2693,7 @@ function autoAssignSchedule() {
   if (scheduleRows.length > 0) {
     // 日付順にソート
     scheduleRows.sort(function(a, b) { return a[1] < b[1] ? -1 : a[1] > b[1] ? 1 : 0; });
-    var insertRange = sheet.getRange(sheet.getLastRow() + 1, 1, scheduleRows.length, 9);
+    var insertRange = sheet.getRange(sheet.getLastRow() + 1, 1, scheduleRows.length, 10);
     insertRange.setNumberFormat('@');
     insertRange.setValues(scheduleRows);
   }

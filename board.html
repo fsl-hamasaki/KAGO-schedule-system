@@ -395,7 +395,10 @@
         var colorIdx = staffColorIdx[e.staffName] !== undefined ? staffColorIdx[e.staffName] : 8;
         var schoolShort = e.schoolName;
         var staffShort = (e.staffName || '').split(/[\s　]/)[0];
-        html += '<div class="visit v-c' + (colorIdx % 9) + '" title="' + esc(e.schoolName) + ' - ' + esc(e.staffName) + '">' +
+        var titleParts = [e.schoolName + ' - ' + e.staffName];
+        if (e.supportType === 'オンライン') titleParts.push('オンライン' + (e.remoteTool ? '（' + e.remoteTool + '）' : ''));
+        if (e.timeSlot) titleParts.push(e.timeSlot);
+        html += '<div class="visit v-c' + (colorIdx % 9) + '" title="' + esc(titleParts.join(' / ')) + '">' +
           esc(schoolShort) + ' / ' + esc(staffShort) +
           '</div>';
       }
@@ -470,7 +473,10 @@
       for (var k = 0; k < entries.length; k++) {
         var e = entries[k];
         var schoolShort = e.schoolName;
-        html += '<div class="school" title="' + esc(e.schoolName) + '">' +
+        var miniTitleParts = [e.schoolName];
+        if (e.supportType === 'オンライン') miniTitleParts.push('オンライン' + (e.remoteTool ? '（' + e.remoteTool + '）' : ''));
+        if (e.timeSlot) miniTitleParts.push(e.timeSlot);
+        html += '<div class="school" title="' + esc(miniTitleParts.join(' / ')) + '">' +
           esc(schoolShort) + '</div>';
       }
       html += '</td>';

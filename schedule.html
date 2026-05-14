@@ -534,6 +534,25 @@
           <div id="onlineHint1" style="display:none; align-self:center; font-size:0.78rem; color:#5f6368;">
             <span style="display:inline-block; padding:4px 10px; background:#e8f0fe; border:1px solid #c6dafc; border-radius:6px;">時刻は各候補日ごとに指定してください</span>
           </div>
+
+          <!-- オンライン時のリモートツール選択 -->
+          <div id="remoteTool1" style="display:none;">
+            <div style="font-size:0.82rem; font-weight:600; color:#5f6368; margin-bottom:6px;">リモートツール</div>
+            <div style="display:flex; gap:14px;">
+              <label style="display:flex; align-items:center; gap:5px; font-size:0.88rem; cursor:pointer;">
+                <input type="radio" name="remoteTool" value="Meet" checked style="accent-color:#1a73e8;">
+                Meet
+              </label>
+              <label style="display:flex; align-items:center; gap:5px; font-size:0.88rem; cursor:pointer;">
+                <input type="radio" name="remoteTool" value="Teams" style="accent-color:#1a73e8;">
+                Teams
+              </label>
+              <label style="display:flex; align-items:center; gap:5px; font-size:0.88rem; cursor:pointer;">
+                <input type="radio" name="remoteTool" value="Zoom" style="accent-color:#1a73e8;">
+                Zoom
+              </label>
+            </div>
+          </div>
         </div>
 
         <!-- 候補日 -->
@@ -595,6 +614,25 @@
 
             <div id="onlineHint2" style="display:none; align-self:center; font-size:0.78rem; color:#5f6368;">
               <span style="display:inline-block; padding:4px 10px; background:#e8f0fe; border:1px solid #c6dafc; border-radius:6px;">時刻は各候補日ごとに指定してください</span>
+            </div>
+
+            <!-- オンライン時のリモートツール選択（2回目） -->
+            <div id="remoteTool2" style="display:none;">
+              <div style="font-size:0.82rem; font-weight:600; color:#5f6368; margin-bottom:6px;">リモートツール</div>
+              <div style="display:flex; gap:14px;">
+                <label style="display:flex; align-items:center; gap:5px; font-size:0.88rem; cursor:pointer;">
+                  <input type="radio" name="remoteTool2" value="Meet" checked style="accent-color:#1a73e8;">
+                  Meet
+                </label>
+                <label style="display:flex; align-items:center; gap:5px; font-size:0.88rem; cursor:pointer;">
+                  <input type="radio" name="remoteTool2" value="Teams" style="accent-color:#1a73e8;">
+                  Teams
+                </label>
+                <label style="display:flex; align-items:center; gap:5px; font-size:0.88rem; cursor:pointer;">
+                  <input type="radio" name="remoteTool2" value="Zoom" style="accent-color:#1a73e8;">
+                  Zoom
+                </label>
+              </div>
             </div>
           </div>
 
@@ -874,7 +912,10 @@
           chipBg = 'background:#e8f0fe; color:#1a73e8;';
         }
         var iconHtml = isOnline ? '<span style="margin-right:2px;">💻</span>' : '';
-        var titleAttr = sched.timeSlot ? ' title="' + esc(sched.timeSlot + (isOnline ? ' (オンライン)' : '')) + '"' : '';
+        var titleParts = [];
+        if (sched.timeSlot) titleParts.push(sched.timeSlot);
+        if (isOnline) titleParts.push('オンライン' + (sched.remoteTool ? '（' + sched.remoteTool + '）' : ''));
+        var titleAttr = titleParts.length ? ' title="' + esc(titleParts.join(' / ')) + '"' : '';
         html += '<div style="display:inline-block; padding:1px 5px; border-radius:3px; font-size:0.62rem; font-weight:600; ' + chipBg + '"' + titleAttr + '>';
         html += iconHtml + esc(staffShort) + (isSubstitute ? '(代行)' : '');
         html += '</div>';
@@ -1043,6 +1084,8 @@
     document.getElementById('timeSlotVisit' + visitNum).style.display = isOnline ? 'none' : 'block';
     var hint = document.getElementById('onlineHint' + visitNum);
     if (hint) hint.style.display = isOnline ? 'block' : 'none';
+    var remote = document.getElementById('remoteTool' + visitNum);
+    if (remote) remote.style.display = isOnline ? 'block' : 'none';
 
     // 候補日ごとのオンライン時刻入力ブロックを表示/非表示
     var prefix = visitNum === 1 ? 'v1' : 'v2';
@@ -1106,6 +1149,15 @@
       if (radios[i].checked) return radios[i].value;
     }
     return '訪問';
+  }
+
+  // リモートツール取得ヘルパー
+  function getRemoteTool(visitNum) {
+    var radios = document.querySelectorAll('input[name="remoteTool' + (visitNum === 1 ? '' : '2') + '"]');
+    for (var i = 0; i < radios.length; i++) {
+      if (radios[i].checked) return radios[i].value;
+    }
+    return 'Meet';
   }
 
   function renderCandidates(containerId, prefix) {
@@ -1195,6 +1247,14 @@
       onSupportTypeChange(1);
     }
 
+    // 1回目 リモートツールの復元
+    if (existing.remoteTool) {
+      var rt1Radios = document.querySelectorAll('input[name="remoteTool"]');
+      for (var i = 0; i < rt1Radios.length; i++) {
+        if (rt1Radios[i].value === existing.remoteTool) { rt1Radios[i].checked = true; break; }
+      }
+    }
+
     // 1回目 時間帯の復元
     if (existing.timeSlot) {
       if (existing.supportType === 'オンライン') {
@@ -1247,6 +1307,14 @@
           if (st2Radios[i].value === existing.supportType2) { st2Radios[i].checked = true; break; }
         }
         onSupportTypeChange(2);
+      }
+
+      // 2回目 リモートツールの復元
+      if (existing.remoteTool2) {
+        var rt2Radios = document.querySelectorAll('input[name="remoteTool2"]');
+        for (var i = 0; i < rt2Radios.length; i++) {
+          if (rt2Radios[i].value === existing.remoteTool2) { rt2Radios[i].checked = true; break; }
+        }
       }
 
       // 2回目 時間帯の復元
@@ -1317,6 +1385,16 @@
     }
     if (wantSecond && formData.supportType2 !== 'オンライン') {
       formData.timeSlot2 = getVisitTimeSlot(2);
+    }
+
+    // オンライン時のリモートツール選択を取得
+    formData.remoteTool = '';
+    formData.remoteTool2 = '';
+    if (formData.supportType === 'オンライン') {
+      formData.remoteTool = getRemoteTool(1);
+    }
+    if (wantSecond && formData.supportType2 === 'オンライン') {
+      formData.remoteTool2 = getRemoteTool(2);
     }
 
     // オンライン時の希望別時刻を集める（候補日が「特に指定しない」でも、入力されていれば取得）
