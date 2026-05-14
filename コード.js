@@ -1698,7 +1698,8 @@ function appendCandidateRows_(rows) {
     '2回目_第1候補', '2回目_第2候補', '2回目_第3候補',
     '備考', '送信日時', 'ICT支援要望',
     '1回目_第2希望時刻', '1回目_第3希望時刻',
-    '2回目_第2希望時刻', '2回目_第3希望時刻'
+    '2回目_第2希望時刻', '2回目_第3希望時刻',
+    'リモートツール', '2回目_リモートツール'
   ];
   var candSheet = getOrCreateSheet_(SHEET_CANDIDATES, candHeaders);
   ensureCandidateExtraColumns_(candSheet);
@@ -1771,11 +1772,13 @@ function setupSampleDataJunJul2026() {
     if (allRows[i][3] === '2026-06') juneCount++;
     else if (allRows[i][3] === '2026-07') julyCount++;
   }
+  var rtStat = countRemoteToolsInRows_(allRows);
 
   return {
     success: true,
     message: '6月・7月サンプルデータ生成完了: 教員追加' + newUsersCount + '名 / 候補日 6月' + juneCount +
-      '件・7月' + julyCount + '件 / 支援員休日 6月' + so6 + '件・7月' + so7 + '件' +
+      '件・7月' + julyCount + '件 / オンライン要望' + rtStat.total +
+      '件（Meet=' + rtStat.Meet + ' / Teams=' + rtStat.Teams + ' / Zoom=' + rtStat.Zoom + '） / 支援員休日 6月' + so6 + '件・7月' + so7 + '件' +
       (m6 ? ' / 6月定例会追加' : '') + (m7 ? ' / 7月定例会追加' : '')
   };
 }
@@ -1789,6 +1792,8 @@ function buildCandidateRow_(school, targetMonth, plan, weekdays, rand, submitIdx
   var v2c1 = '', v2c2 = '', v2c3 = '';
   // 新規: オンライン要望の希望別第2/第3時刻
   var ts1_2 = '', ts1_3 = '', ts2_2 = '', ts2_3 = '';
+  // 新規: リモートツール（Meet/Teams/Zoom、オンライン要望時のみ）
+  var remoteTool = '', remoteTool2 = '';
   var comment = '';
 
   // 1回目: 訪問優先
@@ -1800,6 +1805,7 @@ function buildCandidateRow_(school, targetMonth, plan, weekdays, rand, submitIdx
     timeSlot = pickOnlineTime_(rand);
     ts1_2 = pickOnlineTime_(rand);
     ts1_3 = pickOnlineTime_(rand);
+    remoteTool = pickRemoteTool_(rand);
   }
   var p1 = pick3Dates_(weekdays, rand);
   v1c1 = p1[0] || '特に指定しない';
@@ -1825,6 +1831,7 @@ function buildCandidateRow_(school, targetMonth, plan, weekdays, rand, submitIdx
     timeSlot2 = pickOnlineTime_(rand);
     ts2_2 = pickOnlineTime_(rand);
     ts2_3 = pickOnlineTime_(rand);
+    remoteTool2 = pickRemoteTool_(rand);
     var p2 = pick3Dates_(weekdays, rand);
     v2c1 = p2[0] || '特に指定しない';
     v2c2 = p2[1] || '特に指定しない';
@@ -1868,8 +1875,17 @@ function buildCandidateRow_(school, targetMonth, plan, weekdays, rand, submitIdx
     supportType2, timeSlot2,
     v2c1, v2c2, v2c3,
     comment, submitDate, ictRequest,
-    ts1_2, ts1_3, ts2_2, ts2_3
+    ts1_2, ts1_3, ts2_2, ts2_3,
+    remoteTool, remoteTool2
   ];
+}
+
+// オンライン支援のリモートツールを重み付きランダムで選択（Meet多め、Teams中、Zoom少）
+function pickRemoteTool_(rand) {
+  var r = rand();
+  if (r < 0.6) return 'Meet';
+  if (r < 0.9) return 'Teams';
+  return 'Zoom';
 }
 
 // ICT要望サンプル（授業/校務/設定の3カテゴリから1〜4件）
@@ -2149,10 +2165,13 @@ function setupSampleDataMay2026() {
   var staffOffAdded = setupKagoMonthlyStaffOff_(2026, 5);
   var meetingAdded  = setupKagoMonthlyMeeting_(2026, 5);
 
+  var rtStatMay = countRemoteToolsInRows_(rows);
   return {
     success: true,
     message: '5月サンプルデータ生成完了: 教員追加' + newUsersCount + '名 / 候補日' + rows.length +
-      '件 / 支援員休日' + staffOffAdded + '件' + (meetingAdded ? ' / 5月定例会追加' : '')
+      '件 / オンライン要望' + rtStatMay.total +
+      '件（Meet=' + rtStatMay.Meet + ' / Teams=' + rtStatMay.Teams + ' / Zoom=' + rtStatMay.Zoom + '）' +
+      ' / 支援員休日' + staffOffAdded + '件' + (meetingAdded ? ' / 5月定例会追加' : '')
   };
 }
 
@@ -2898,7 +2917,8 @@ function setupSampleDataJun2026() {
     '2回目_第1候補', '2回目_第2候補', '2回目_第3候補',
     '備考', '送信日時', 'ICT支援要望',
     '1回目_第2希望時刻', '1回目_第3希望時刻',
-    '2回目_第2希望時刻', '2回目_第3希望時刻'
+    '2回目_第2希望時刻', '2回目_第3希望時刻',
+    'リモートツール', '2回目_リモートツール'
   ]);
   ensureCandidateExtraColumns_(candSheet);
   var existing = candSheet.getDataRange().getValues();
@@ -2932,6 +2952,9 @@ function setupSampleDataJun2026() {
   }
   appendCandidateRows_(rows);
 
+  // リモートツール集計（オンライン要望に限る）
+  var remoteToolStat = countRemoteToolsInRows_(rows);
+
   // 6. スケジュールシート（自動割当結果）と手入力スケジュールシートの 6月分はクリア
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var schedSheet = ss.getSheetByName(SHEET_SCHEDULE);
@@ -2956,9 +2979,22 @@ function setupSampleDataJun2026() {
   return {
     success: true,
     message: '【6月要望サンプル投入完了】対象月=2026-06 / ステータス=締切（自動割当前） / 教員追加' + newUsersCount + '名 / 候補日' + rows.length +
-      '件（県立校＋枕崎市） / 支援員休日' + staffOffAdded + '件' + (meetingAdded ? ' / 6月定例会追加' : '') +
+      '件（県立校＋枕崎市） / オンライン要望' + remoteToolStat.total +
+      '件（Meet=' + remoteToolStat.Meet + ' / Teams=' + remoteToolStat.Teams + ' / Zoom=' + remoteToolStat.Zoom + '）' +
+      ' / 支援員休日' + staffOffAdded + '件' + (meetingAdded ? ' / 6月定例会追加' : '') +
       ' ／ 自動割当・手入力は空。次は「スケジュール管理」タブで自動割当を実行してください。'
   };
+}
+
+// rows のリモートツール列を集計（22=1回目, 23=2回目）
+function countRemoteToolsInRows_(rows) {
+  var stat = { total: 0, Meet: 0, Teams: 0, Zoom: 0 };
+  for (var i = 0; i < rows.length; i++) {
+    var t1 = rows[i][22], t2 = rows[i][23];
+    if (t1) { stat.total++; if (stat[t1] !== undefined) stat[t1]++; }
+    if (t2) { stat.total++; if (stat[t2] !== undefined) stat[t2]++; }
+  }
+  return stat;
 }
 
 // ===== レビュー用機能 =====
