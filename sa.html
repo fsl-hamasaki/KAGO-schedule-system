@@ -929,6 +929,23 @@
   var baseUrl = <?!= JSON.stringify(baseUrl) ?>;
   var MANUAL_CAN_EDIT_ALL = true; // SA画面では全員分編集可
 
+  // GAS Web Appはサンドボックス iframe 内で動作するため、
+  // window.top.location.reload() は Chrome/Edge 等で
+  // クロスオリジン制約によりサイレントに失敗することがある。
+  // 対策として、まず baseUrl への navigation（書き込みは cross-origin でも許可される）を試み、
+  // それも失敗した場合に自フレームの reload にフォールバックする。
+  function reloadTopWindow_() {
+    var url = baseUrl || '';
+    var attempts = [
+      function() { if (url) window.top.location.href = url; else window.top.location.reload(); },
+      function() { if (url) window.location.href = url; else window.location.reload(); },
+      function() { window.location.reload(); }
+    ];
+    for (var i = 0; i < attempts.length; i++) {
+      try { attempts[i](); return; } catch (e) { /* 次の手段へ */ }
+    }
+  }
+
   // なりすまし機能
   function updateImpAccounts() {
     var role = document.getElementById('impRole').value;
@@ -2269,10 +2286,10 @@
 
     google.script.run
       .withSuccessHandler(function(result) {
-        msg.textContent = result.message;
+        msg.textContent = (result.message || '') + (result.success ? ' ／ ページを再読み込みします…' : '');
         msg.className = 'message ' + (result.success ? 'success' : 'error');
         if (result.success) {
-          setTimeout(function() { window.top.location.reload(); }, 2500);
+          setTimeout(reloadTopWindow_, 2500);
         }
       })
       .withFailureHandler(function(err) {
@@ -2298,7 +2315,7 @@
         if (result.success) {
           msg.textContent = result.message + ' ページをリロードします...';
           msg.className = 'message success'; msg.style.display = 'inline-block';
-          setTimeout(function() { window.top.location.reload(); }, 1500);
+          setTimeout(reloadTopWindow_, 1500);
         }
       })
       .unconfirmSchedule(settings.targetMonth);
@@ -2317,7 +2334,7 @@
         if (result.success) {
           msg.textContent = result.message + ' ページをリロードします...';
           msg.className = 'message success'; msg.style.display = 'inline-block';
-          setTimeout(function() { window.top.location.reload(); }, 1500);
+          setTimeout(reloadTopWindow_, 1500);
         } else {
           msg.textContent = result.message;
           msg.className = 'message error'; msg.style.display = 'inline-block';
